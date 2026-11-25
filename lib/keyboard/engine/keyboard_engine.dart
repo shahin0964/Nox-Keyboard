@@ -17,7 +17,7 @@ import 'haptic_sound_service.dart';
 import 'bangla_phonetic_engine.dart';
 
 enum KeyboardMode { letters, symbols, moreSymbols }
-enum KeyboardPanel { none, emoji, clipboard, textEditing, themes, voice }
+enum KeyboardPanel { none, emoji, clipboard, textEditing, themes, voice, toolsGrid }
 
 class KeyboardEngine extends ChangeNotifier {
   static final KeyboardEngine _instance = KeyboardEngine._internal();
@@ -76,6 +76,14 @@ class KeyboardEngine extends ChangeNotifier {
 
   bool _isToolbarExpanded = false;
   bool get isToolbarExpanded => _isToolbarExpanded;
+
+  bool _forceShowToolbar = false;
+  bool get forceShowToolbar => _forceShowToolbar;
+
+  void toggleForceShowToolbar() {
+    _forceShowToolbar = !_forceShowToolbar;
+    notifyListeners();
+  }
 
   DateTime? _lastSpaceTapTime;
 

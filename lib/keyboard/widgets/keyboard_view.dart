@@ -6,7 +6,7 @@ import '../../data/preferences_helper.dart';
 import '../../services/ime_platform_bridge.dart';
 import '../engine/keyboard_engine.dart';
 import 'toolbar_widget.dart';
-import 'suggestions_bar_widget.dart';
+import 'tools_grid_panel.dart';
 import 'keyboard_key_widget.dart';
 import 'text_editing_pad.dart';
 import '../../features/clipboard/widgets/clipboard_panel.dart';
@@ -38,10 +38,10 @@ class _NoxFirebaseViewState extends State<NoxKeyboardView> {
     _engine.addListener(_onEngineUpdate);
     _themeManager.addListener(_onThemeUpdate);
 
-    // Sync Gboard-matching dimensions (260dp content + 36dp nav bar padding) with Android InputMethodService
+    // Sync compact Gboard dimensions (224dp content + 36dp nav bar padding) with Android InputMethodService
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _bridge.updateKeyboardDimensions(
-        contentHeight: 260.0,
+        contentHeight: 224.0,
         navBarHeight: _bridge.navBarHeightDp,
       );
     });
@@ -70,6 +70,9 @@ class _NoxFirebaseViewState extends State<NoxKeyboardView> {
 
     Widget mainContent;
     switch (_engine.activePanel) {
+      case KeyboardPanel.toolsGrid:
+        mainContent = ToolsGridPanel(theme: theme, engine: _engine);
+        break;
       case KeyboardPanel.emoji:
         mainContent = EmojiPalette(theme: theme, engine: _engine);
         break;
@@ -93,10 +96,10 @@ class _NoxFirebaseViewState extends State<NoxKeyboardView> {
     Widget keyboardBody = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
+        // Single unified Gboard header bar (contains suggestions or toolbar + mic on right)
         ToolbarWidget(engine: _engine, theme: theme),
-        SuggestionsBarWidget(engine: _engine, theme: theme),
         SizedBox(
-          height: 184.0, // Exact Gboard-proportioned key area height
+          height: 184.0, // Key area height
           child: mainContent,
         ),
         // Dedicated Android navigation bar padding zone (lifts spacebar & keys above gesture bar)

@@ -42,7 +42,7 @@ class NoxInputMethodService : InputMethodService() {
      * This lifts all keys completely above the Android navigation gesture pill and keyboard switcher.
      */
     class InputViewContainer(context: Context) : FrameLayout(context) {
-        var contentHeightDp: Float = 260f
+        var contentHeightDp: Float = 224f
         var navBarHeightDp: Float = 36f
 
         init {
@@ -260,6 +260,11 @@ class NoxInputMethodService : InputMethodService() {
         super.onConfigureWindow(win, isFullscreen, isCandidatesOnly)
         win.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
         win.setGravity(Gravity.BOTTOM)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            win.attributes = win.attributes.apply {
+                preferredRefreshRate = 60.0f
+            }
+        }
     }
 
     override fun onEvaluateFullscreenMode(): Boolean {
