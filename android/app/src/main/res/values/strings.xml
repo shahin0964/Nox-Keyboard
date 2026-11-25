@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Nox Keyboard</string>
+    <string name="keyboard_name">Nox Keyboard</string>
+    <string name="subtype_en_us">English (US)</string>
+    <string name="subtype_bn_bd">Bangla (Bangladesh)</string>
+</resources>
