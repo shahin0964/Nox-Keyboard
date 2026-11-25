@@ -3,7 +3,6 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../../themes/theme_model.dart';
 import '../../data/preferences_helper.dart';
-import '../../services/ime_platform_bridge.dart';
 import '../layouts/keyboard_layout.dart';
 import '../engine/keyboard_engine.dart';
 import 'key_preview_popup.dart';
@@ -31,7 +30,6 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
   OverlayEntry? _alternatesEntry;
   Timer? _longPressTimer;
   Timer? _repeatTimer;
-  Timer? _previewDismissTimer;
   Offset _pointerDownPosition = Offset.zero;
   bool _hasTriggeredLongPress = false;
 
@@ -39,7 +37,6 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
   void dispose() {
     _longPressTimer?.cancel();
     _repeatTimer?.cancel();
-    _previewDismissTimer?.cancel();
     _removeOverlays();
     super.dispose();
   }
@@ -61,16 +58,17 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
     final offset = renderBox.localToGlobal(Offset.zero);
     final size = renderBox.size;
 
-    _previewDismissTimer?.cancel();
     _previewEntry?.remove();
     _previewEntry = OverlayEntry(
       builder: (context) {
         return Positioned(
-          left: offset.dx + (size.width - 56) / 2,
-          top: offset.dy - 68,
+          left: offset.dx - 4,
+          top: offset.dy - 26,
           child: KeyPreviewPopup(
             label: widget.keyboardKey.primary,
             theme: widget.theme,
+            keyWidth: size.width,
+            keyHeight: size.height,
           ),
         );
       },
@@ -79,13 +77,9 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
     Overlay.of(context).insert(_previewEntry!);
   }
 
-  void _schedulePreviewDismiss() {
-    _previewDismissTimer?.cancel();
-    // Allow the user to see the Gboard letter floating up before fading out
-    _previewDismissTimer = Timer(const Duration(milliseconds: 110), () {
-      _previewEntry?.remove();
-      _previewEntry = null;
-    });
+  void _hidePreviewPopup() {
+    _previewEntry?.remove();
+    _previewEntry = null;
   }
 
   void _showAlternatesPopup() {
@@ -98,10 +92,7 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
     final offset = renderBox.localToGlobal(Offset.zero);
     final size = renderBox.size;
 
-    _previewDismissTimer?.cancel();
-    _previewEntry?.remove();
-    _previewEntry = null;
-
+    _hidePreviewPopup();
     _alternatesEntry?.remove();
     _hasTriggeredLongPress = true;
 
@@ -131,7 +122,7 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
     Overlay.of(context).insert(_alternatesEntry!);
   }
 
-  // --- Pointer Event Handlers for Instant, High-Response Typing ---
+  // --- Instant Pointer Event Handlers ---
 
   void _onPointerDown(PointerDownEvent event) {
     _pointerDownPosition = event.position;
@@ -142,16 +133,13 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
 
     if (k.action == KeyAction.character) {
       _showPreviewPopup();
-      // Start non-blocking timer for alternate characters
       if (k.alternateChars.isNotEmpty) {
         _longPressTimer = Timer(const Duration(milliseconds: 350), () {
           _showAlternatesPopup();
         });
       }
     } else if (k.action == KeyAction.backspace) {
-      // Immediate backspace commit on touch down
       widget.engine.onKeyPress(k);
-      // Repeating backspace when held
       _longPressTimer = Timer(const Duration(milliseconds: 380), () {
         _repeatTimer = Timer.periodic(const Duration(milliseconds: 55), (_) {
           widget.engine.onKeyPress(k);
@@ -160,7 +148,6 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
     } else if (k.action == KeyAction.space) {
       widget.engine.onKeyPress(k);
     } else {
-      // Immediate action trigger for Shift, Enter, ?123, etc.
       widget.engine.onKeyPress(k);
     }
   }
@@ -168,12 +155,11 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
   void _onPointerMove(PointerMoveEvent event) {
     final distance = (event.position - _pointerDownPosition).distance;
 
-    // If moved significantly, cancel long press
     if (distance > 24) {
       _longPressTimer?.cancel();
     }
 
-    // Spacebar cursor glide navigation
+    // Spacebar cursor glide
     if (widget.keyboardKey.action == KeyAction.space) {
       final delta = event.localDelta.dx;
       if (delta.abs() > 4) {
@@ -185,7 +171,7 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
       }
     }
 
-    // Backspace swipe left delete
+    // Backspace swipe delete
     if (widget.keyboardKey.action == KeyAction.backspace) {
       final diffX = event.position.dx - _pointerDownPosition.dx;
       if (diffX < -50) {
@@ -199,14 +185,13 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
   void _onPointerUp(PointerUpEvent event) {
     _longPressTimer?.cancel();
     _repeatTimer?.cancel();
+    _hidePreviewPopup();
     setState(() => _isPressed = false);
 
     final k = widget.keyboardKey;
 
     if (k.action == KeyAction.character) {
-      _schedulePreviewDismiss();
       if (!_hasTriggeredLongPress) {
-        // Fast, zero-latency keystroke registration
         widget.engine.onKeyPress(k);
       }
     }
@@ -215,12 +200,11 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
   void _onPointerCancel(PointerCancelEvent event) {
     _longPressTimer?.cancel();
     _repeatTimer?.cancel();
+    _hidePreviewPopup();
     setState(() => _isPressed = false);
 
     final k = widget.keyboardKey;
     if (k.action == KeyAction.character) {
-      _schedulePreviewDismiss();
-      // Jitter tolerance: if finger moved slightly during tap, don't drop the keystroke!
       final distance = (event.position - _pointerDownPosition).distance;
       if (distance < 20 && !_hasTriggeredLongPress) {
         widget.engine.onKeyPress(k);
@@ -233,15 +217,14 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
     final k = widget.keyboardKey;
     final isSpecial = k.action != KeyAction.character;
     final isShift = k.action == KeyAction.shift;
-    final isSpace = k.action == KeyAction.space;
     final isEnter = k.action == KeyAction.enter;
 
     final isShiftActive = isShift && (widget.engine.isShifted || widget.engine.isCapsLock);
 
-    // Pill radius calculation
+    // Pill styling for action keys
     final double borderRadius = isSpecial
-        ? 24.0 // Action pills (Shift, Enter, Backspace, ?123, Space)
-        : widget.theme.keyBorderRadius; // Pill rounded character keys
+        ? 20.0
+        : widget.theme.keyBorderRadius;
 
     Color bg;
     if (isShiftActive) {
@@ -258,8 +241,7 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
 
     Widget content = _buildKeyContent(k, isShiftActive);
 
-    Widget keyContainer = AnimatedContainer(
-      duration: const Duration(milliseconds: 50),
+    Widget keyContainer = Container(
       margin: EdgeInsets.symmetric(
         horizontal: widget.theme.keyMarginH,
         vertical: widget.theme.keyMarginV,
@@ -267,14 +249,13 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(borderRadius),
-        // Modern frosted glass subtle highlight gradient
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
             _isPressed
                 ? Colors.transparent
-                : Colors.white.withOpacity(widget.theme.isDark ? 0.07 : 0.45),
+                : Colors.white.withOpacity(widget.theme.isDark ? 0.06 : 0.4),
             Colors.transparent,
           ],
         ),
@@ -283,19 +264,19 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
               ? widget.theme.accentColor.withOpacity(0.6)
               : (widget.theme.keyBorderWidth > 0
                   ? widget.theme.keyBorderColor
-                  : Colors.white.withOpacity(widget.theme.isDark ? 0.08 : 0.2)),
+                  : Colors.white.withOpacity(widget.theme.isDark ? 0.08 : 0.18)),
           width: isEnter ? 1.2 : (widget.theme.keyBorderWidth > 0 ? widget.theme.keyBorderWidth : 0.8),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(widget.theme.isDark ? 0.35 : 0.09),
-            offset: const Offset(0, 2),
-            blurRadius: 2.0,
+            color: Colors.black.withOpacity(widget.theme.isDark ? 0.3 : 0.08),
+            offset: const Offset(0, 1.5),
+            blurRadius: 1.5,
           ),
           if (isEnter)
             BoxShadow(
               color: widget.theme.accentColor.withOpacity(0.2),
-              blurRadius: 6,
+              blurRadius: 5,
               offset: const Offset(0, 1),
             ),
         ],
@@ -357,7 +338,7 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
       }
       return Icon(
         enterIcon,
-        size: 21,
+        size: 20,
         color: widget.theme.accentColor,
       );
     }

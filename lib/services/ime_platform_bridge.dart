@@ -27,12 +27,21 @@ class ImePlatformBridge {
     _isMockMode = enabled;
   }
 
+  double _navBarHeightDp = 36.0;
+  double get navBarHeightDp => _navBarHeightDp;
+
   void _initChannel() {
     _imeChannel.setMethodCallHandler((call) async {
       switch (call.method) {
         case 'onStartInput':
           if (call.arguments is Map) {
             final map = Map<String, dynamic>.from(call.arguments as Map);
+            if (map.containsKey('navBarHeightDp')) {
+              final nav = (map['navBarHeightDp'] as num?)?.toDouble();
+              if (nav != null && nav > 0) {
+                _navBarHeightDp = nav;
+              }
+            }
             onStartInputCallback?.call(map);
           }
           break;
@@ -41,6 +50,19 @@ class ImePlatformBridge {
           break;
       }
     });
+  }
+
+  Future<void> updateKeyboardDimensions({
+    required double contentHeight,
+    double? navBarHeight,
+  }) async {
+    if (_isMockMode) return;
+    try {
+      await _imeChannel.invokeMethod('updateKeyboardDimensions', {
+        'contentHeight': contentHeight,
+        if (navBarHeight != null) 'navBarHeight': navBarHeight,
+      });
+    } catch (_) {}
   }
 
   Future<void> updateKeyboardHeight(double height) async {

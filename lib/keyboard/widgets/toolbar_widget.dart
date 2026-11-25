@@ -17,8 +17,8 @@ class ToolbarWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 44,
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      height: 38,
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
       decoration: BoxDecoration(
         color: theme.toolbarColor.withOpacity(theme.isDark ? 0.88 : 0.94),
         border: Border(
@@ -33,13 +33,13 @@ class ToolbarWidget extends StatelessWidget {
           // Expand/collapse pill button
           InkWell(
             onTap: () => engine.toggleToolbarExpanded(),
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(18),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-              margin: const EdgeInsets.only(right: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+              margin: const EdgeInsets.only(right: 3),
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(theme.isDark ? 0.05 : 0.2),
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(18),
                 border: Border.all(
                   color: Colors.white.withOpacity(theme.isDark ? 0.08 : 0.16),
                   width: 0.8,
@@ -47,7 +47,7 @@ class ToolbarWidget extends StatelessWidget {
               ),
               child: Icon(
                 engine.isToolbarExpanded ? CupertinoIcons.chevron_left : CupertinoIcons.ellipsis,
-                size: 16,
+                size: 15,
                 color: theme.secondaryTextColor,
               ),
             ),
@@ -130,15 +130,15 @@ class ToolbarWidget extends StatelessWidget {
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(18),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-        margin: const EdgeInsets.symmetric(horizontal: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        margin: const EdgeInsets.symmetric(horizontal: 2.5),
         decoration: BoxDecoration(
           color: isActive
               ? theme.accentColor.withOpacity(0.24)
               : Colors.white.withOpacity(theme.isDark ? 0.05 : 0.22),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(
             color: isActive
                 ? theme.accentColor.withOpacity(0.8)
@@ -149,7 +149,7 @@ class ToolbarWidget extends StatelessWidget {
               ? [
                   BoxShadow(
                     color: theme.accentColor.withOpacity(0.25),
-                    blurRadius: 6,
+                    blurRadius: 5,
                     offset: const Offset(0, 1),
                   ),
                 ]
@@ -157,7 +157,7 @@ class ToolbarWidget extends StatelessWidget {
         ),
         child: Icon(
           icon,
-          size: 18,
+          size: 17,
           color: isActive ? theme.accentColor : theme.secondaryTextColor,
         ),
       ),

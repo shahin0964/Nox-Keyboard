@@ -18,8 +18,8 @@ class SuggestionsBarWidget extends StatelessWidget {
     final candidates = engine.candidates;
 
     return Container(
-      height: 44,
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      height: 38,
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
       decoration: BoxDecoration(
         color: theme.suggestionBarColor.withOpacity(theme.isDark ? 0.82 : 0.92),
         border: Border(
@@ -36,7 +36,7 @@ class SuggestionsBarWidget extends StatelessWidget {
                 final c = candidates[index];
                 return Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 3),
+                    padding: const EdgeInsets.symmetric(horizontal: 2.5),
                     child: _buildSuggestionPill(c),
                   ),
                 );
@@ -50,14 +50,14 @@ class SuggestionsBarWidget extends StatelessWidget {
 
     return InkWell(
       onTap: () => engine.selectSuggestion(c),
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(18),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
         decoration: BoxDecoration(
           color: isAutocorrect
               ? theme.accentColor.withOpacity(0.18)
               : theme.keyColor.withOpacity(theme.isDark ? 0.65 : 0.85),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(
             color: isAutocorrect
                 ? theme.accentColor.withOpacity(0.65)
@@ -81,7 +81,7 @@ class SuggestionsBarWidget extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: isAutocorrect ? theme.accentColor : theme.textColor,
-              fontSize: isAutocorrect ? 15 : 14.5,
+              fontSize: isAutocorrect ? 14.5 : 14.0,
               fontWeight: isAutocorrect ? FontWeight.bold : FontWeight.w500,
               letterSpacing: 0.2,
             ),
@@ -95,10 +95,10 @@ class SuggestionsBarWidget extends StatelessWidget {
     if (engine.isPassword) {
       return Center(
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           decoration: BoxDecoration(
             color: Colors.white.withOpacity(theme.isDark ? 0.05 : 0.2),
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(18),
             border: Border.all(
               color: Colors.white.withOpacity(theme.isDark ? 0.08 : 0.16),
               width: 0.8,
@@ -107,13 +107,13 @@ class SuggestionsBarWidget extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.lock_outline, size: 14, color: theme.secondaryTextColor),
-              const SizedBox(width: 6),
+              Icon(Icons.lock_outline, size: 13, color: theme.secondaryTextColor),
+              const SizedBox(width: 5),
               Text(
                 'Password field (secure mode)',
                 style: TextStyle(
                   color: theme.secondaryTextColor,
-                  fontSize: 12,
+                  fontSize: 11.5,
                   fontWeight: FontWeight.w400,
                 ),
               ),
@@ -143,12 +143,12 @@ class SuggestionsBarWidget extends StatelessWidget {
           engine.activePage.rows.first.keys.first.copyWith(primary: p),
         );
       },
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(14),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(theme.isDark ? 0.05 : 0.25),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: Colors.white.withOpacity(theme.isDark ? 0.07 : 0.18),
             width: 0.8,
@@ -158,7 +158,7 @@ class SuggestionsBarWidget extends StatelessWidget {
           p,
           style: TextStyle(
             color: theme.secondaryTextColor.withOpacity(0.9),
-            fontSize: 15,
+            fontSize: 14.5,
             fontWeight: FontWeight.w600,
           ),
         ),

@@ -38,24 +38,44 @@ class NoxInputMethodService : InputMethodService() {
 
     /**
      * Custom FrameLayout container that enforces exact measured height for the Android IME window.
-     * Prevents FlutterView from expanding and taking over the entire screen.
+     * Incorporates both content height (Gboard size: ~260dp) and the Android system navigation bar height (~36dp).
+     * This lifts all keys completely above the Android navigation gesture pill and keyboard switcher.
      */
     class InputViewContainer(context: Context) : FrameLayout(context) {
-        var keyboardHeightPx: Int = (280 * context.resources.displayMetrics.density).toInt()
+        var contentHeightDp: Float = 260f
+        var navBarHeightDp: Float = 36f
 
-        fun updateHeight(heightDp: Float) {
-            val newHeightPx = (heightDp * context.resources.displayMetrics.density).toInt()
-            if (keyboardHeightPx != newHeightPx) {
-                keyboardHeightPx = newHeightPx
-                requestLayout()
+        init {
+            navBarHeightDp = detectNavBarHeightDp()
+        }
+
+        private fun detectNavBarHeightDp(): Float {
+            val density = context.resources.displayMetrics.density
+            val resId = context.resources.getIdentifier("navigation_bar_height", "dimen", "android")
+            val px = if (resId > 0) context.resources.getDimensionPixelSize(resId) else (36 * density).toInt()
+            val dp = px / density
+            return if (dp >= 24f && dp <= 48f) dp else 36f
+        }
+
+        fun updateDimensions(contentDp: Float, navDp: Float?) {
+            contentHeightDp = contentDp
+            if (navDp != null && navDp > 0) {
+                navBarHeightDp = navDp
             }
+            requestLayout()
+        }
+
+        fun getTotalHeightPx(): Int {
+            val density = context.resources.displayMetrics.density
+            return ((contentHeightDp + navBarHeightDp) * density).toInt()
         }
 
         override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
             val width = MeasureSpec.getSize(widthMeasureSpec)
-            val heightSpec = MeasureSpec.makeMeasureSpec(keyboardHeightPx, MeasureSpec.EXACTLY)
-            super.onMeasure(widthMeasureSpec, heightSpec)
-            setMeasuredDimension(width, keyboardHeightPx)
+            val totalPx = getTotalHeightPx()
+            val exactHeightSpec = MeasureSpec.makeMeasureSpec(totalPx, MeasureSpec.EXACTLY)
+            super.onMeasure(widthMeasureSpec, exactHeightSpec)
+            setMeasuredDimension(width, totalPx)
         }
     }
 
@@ -225,9 +245,10 @@ class NoxInputMethodService : InputMethodService() {
                     val text = ic?.getTextAfterCursor(length, 0)?.toString() ?: ""
                     result.success(text)
                 }
-                "updateKeyboardHeight" -> {
-                    val heightDp = (call.argument<Double>("height") ?: 280.0).toFloat()
-                    inputContainer?.updateHeight(heightDp)
+                "updateKeyboardDimensions" -> {
+                    val contentDp = (call.argument<Double>("contentHeight") ?: 260.0).toFloat()
+                    val navDp = call.argument<Double>("navBarHeight")?.toFloat()
+                    inputContainer?.updateDimensions(contentDp, navDp)
                     result.success(true)
                 }
                 else -> result.notImplemented()
@@ -291,6 +312,7 @@ class NoxInputMethodService : InputMethodService() {
         val isUri = (variation == InputType.TYPE_TEXT_VARIATION_URI)
 
         val beforeText = currentInputConnection?.getTextBeforeCursor(50, 0)?.toString() ?: ""
+        val navBarDp = inputContainer?.navBarHeightDp ?: 36f
 
         val data = hashMapOf<String, Any>(
             "inputType" to inputType,
@@ -302,7 +324,8 @@ class NoxInputMethodService : InputMethodService() {
             "isNumber" to isNumber,
             "isEmail" to isEmail,
             "isUri" to isUri,
-            "textBeforeCursor" to beforeText
+            "textBeforeCursor" to beforeText,
+            "navBarHeightDp" to navBarDp
         )
 
         channel?.invokeMethod("onStartInput", data)
