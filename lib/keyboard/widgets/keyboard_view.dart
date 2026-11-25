@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../themes/theme_model.dart';
 import '../../themes/theme_manager.dart';
 import '../../data/preferences_helper.dart';
+import '../../services/ime_platform_bridge.dart';
 import '../engine/keyboard_engine.dart';
 import 'toolbar_widget.dart';
 import 'suggestions_bar_widget.dart';
@@ -35,6 +36,11 @@ class _NoxFirebaseViewState extends State<NoxKeyboardView> {
     super.initState();
     _engine.addListener(_onEngineUpdate);
     _themeManager.addListener(_onThemeUpdate);
+
+    // Sync user's keyboard height with the native Android InputMethodService
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ImePlatformBridge().updateKeyboardHeight(_prefs.keyboardHeight);
+    });
   }
 
   @override
@@ -85,7 +91,7 @@ class _NoxFirebaseViewState extends State<NoxKeyboardView> {
         ToolbarWidget(engine: _engine, theme: theme),
         SuggestionsBarWidget(engine: _engine, theme: theme),
         SizedBox(
-          height: keyboardHeight - 82, // Total height minus toolbar (40) and suggestions (42)
+          height: (keyboardHeight - 88).coerceAtLeast(180), // Total height minus toolbar (44) and suggestions (44)
           child: mainContent,
         ),
       ],
@@ -100,6 +106,7 @@ class _NoxFirebaseViewState extends State<NoxKeyboardView> {
       color: theme.backgroundColor,
       child: SafeArea(
         top: false,
+        bottom: true,
         child: Container(
           color: theme.backgroundColor,
           child: keyboardBody,
@@ -112,20 +119,50 @@ class _NoxFirebaseViewState extends State<NoxKeyboardView> {
     final isLeft = _engine.oneHandedMode == 'left';
 
     final sidebar = Container(
-      width: 50,
-      color: theme.toolbarColor,
+      width: 52,
+      color: theme.toolbarColor.withOpacity(theme.isDark ? 0.8 : 0.95),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          // Expand to full button
-          IconButton(
-            icon: Icon(CupertinoIcons.arrow_up_left_arrow_down_right, size: 18, color: theme.secondaryTextColor),
-            onPressed: () => _engine.setOneHandedMode('none'),
+          // Expand to full pill button
+          InkWell(
+            onTap: () => _engine.setOneHandedMode('none'),
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(theme.isDark ? 0.06 : 0.2),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.white.withOpacity(theme.isDark ? 0.08 : 0.16),
+                ),
+              ),
+              child: Icon(
+                CupertinoIcons.arrow_up_left_arrow_down_right,
+                size: 18,
+                color: theme.secondaryTextColor,
+              ),
+            ),
           ),
-          // Switch side button
-          IconButton(
-            icon: Icon(isLeft ? CupertinoIcons.arrow_right_circle : CupertinoIcons.arrow_left_circle, size: 20, color: theme.secondaryTextColor),
-            onPressed: () => _engine.setOneHandedMode(isLeft ? 'right' : 'left'),
+          // Switch side pill button
+          InkWell(
+            onTap: () => _engine.setOneHandedMode(isLeft ? 'right' : 'left'),
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(theme.isDark ? 0.06 : 0.2),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.white.withOpacity(theme.isDark ? 0.08 : 0.16),
+                ),
+              ),
+              child: Icon(
+                isLeft ? CupertinoIcons.arrow_right_circle : CupertinoIcons.arrow_left_circle,
+                size: 20,
+                color: theme.secondaryTextColor,
+              ),
+            ),
           ),
         ],
       ),
@@ -173,4 +210,8 @@ class _NoxFirebaseViewState extends State<NoxKeyboardView> {
       ),
     );
   }
+}
+
+extension on double {
+  double coerceAtLeast(double min) => this < min ? min : this;
 }

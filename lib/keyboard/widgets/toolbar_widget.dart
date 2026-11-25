@@ -17,68 +17,80 @@ class ToolbarWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 40,
+      height: 44,
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
       decoration: BoxDecoration(
-        color: theme.toolbarColor,
+        color: theme.toolbarColor.withOpacity(theme.isDark ? 0.88 : 0.94),
         border: Border(
           bottom: BorderSide(
-            color: theme.textColor.withOpacity(0.08),
-            width: 0.5,
+            color: Colors.white.withOpacity(theme.isDark ? 0.06 : 0.15),
+            width: 0.8,
           ),
         ),
       ),
       child: Row(
         children: [
-          // Expand/collapse chevron
-          IconButton(
-            icon: Icon(
-              engine.isToolbarExpanded ? CupertinoIcons.chevron_left : CupertinoIcons.ellipsis,
-              size: 18,
-              color: theme.secondaryTextColor,
+          // Expand/collapse pill button
+          InkWell(
+            onTap: () => engine.toggleToolbarExpanded(),
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              margin: const EdgeInsets.only(right: 4),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(theme.isDark ? 0.05 : 0.2),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: Colors.white.withOpacity(theme.isDark ? 0.08 : 0.16),
+                  width: 0.8,
+                ),
+              ),
+              child: Icon(
+                engine.isToolbarExpanded ? CupertinoIcons.chevron_left : CupertinoIcons.ellipsis,
+                size: 16,
+                color: theme.secondaryTextColor,
+              ),
             ),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-            onPressed: () => engine.toggleToolbarExpanded(),
           ),
 
-          // Tools list
+          // Tools list in modern pill capsules
           Expanded(
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
               child: Row(
                 children: [
-                  _buildToolItem(
+                  _buildPillToolItem(
                     icon: CupertinoIcons.smiley,
                     label: 'Emoji',
                     isActive: engine.activePanel == KeyboardPanel.emoji,
                     onTap: () => engine.openPanel(KeyboardPanel.emoji),
                   ),
-                  _buildToolItem(
+                  _buildPillToolItem(
                     icon: CupertinoIcons.doc_on_clipboard,
                     label: 'Clipboard',
                     isActive: engine.activePanel == KeyboardPanel.clipboard,
                     onTap: () => engine.openPanel(KeyboardPanel.clipboard),
                   ),
-                  _buildToolItem(
+                  _buildPillToolItem(
                     icon: CupertinoIcons.mic,
                     label: 'Voice',
                     isActive: engine.activePanel == KeyboardPanel.voice,
                     onTap: () => engine.openPanel(KeyboardPanel.voice),
                   ),
-                  _buildToolItem(
+                  _buildPillToolItem(
                     icon: CupertinoIcons.arrow_right_arrow_left,
                     label: 'Edit',
                     isActive: engine.activePanel == KeyboardPanel.textEditing,
                     onTap: () => engine.openPanel(KeyboardPanel.textEditing),
                   ),
-                  _buildToolItem(
-                    icon: Icons.palette,
+                  _buildPillToolItem(
+                    icon: Icons.palette_outlined,
                     label: 'Themes',
                     isActive: engine.activePanel == KeyboardPanel.themes,
                     onTap: () => engine.openPanel(KeyboardPanel.themes),
                   ),
-                  _buildToolItem(
+                  _buildPillToolItem(
                     icon: CupertinoIcons.hand_draw,
                     label: 'One-Hand',
                     isActive: engine.oneHandedMode != 'none',
@@ -89,13 +101,13 @@ class ToolbarWidget extends StatelessWidget {
                       engine.setOneHandedMode(next);
                     },
                   ),
-                  _buildToolItem(
+                  _buildPillToolItem(
                     icon: CupertinoIcons.number,
                     label: 'Numbers',
                     isActive: engine.showNumberRow,
                     onTap: () => engine.toggleNumberRow(),
                   ),
-                  _buildToolItem(
+                  _buildPillToolItem(
                     icon: CupertinoIcons.settings,
                     label: 'Settings',
                     isActive: false,
@@ -110,7 +122,7 @@ class ToolbarWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildToolItem({
+  Widget _buildPillToolItem({
     required IconData icon,
     required String label,
     required bool isActive,
@@ -118,17 +130,34 @@ class ToolbarWidget extends StatelessWidget {
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(20),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        margin: const EdgeInsets.symmetric(horizontal: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+        margin: const EdgeInsets.symmetric(horizontal: 3),
         decoration: BoxDecoration(
-          color: isActive ? theme.accentColor.withOpacity(0.18) : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
+          color: isActive
+              ? theme.accentColor.withOpacity(0.24)
+              : Colors.white.withOpacity(theme.isDark ? 0.05 : 0.22),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isActive
+                ? theme.accentColor.withOpacity(0.8)
+                : Colors.white.withOpacity(theme.isDark ? 0.08 : 0.18),
+            width: isActive ? 1.2 : 0.8,
+          ),
+          boxShadow: isActive
+              ? [
+                  BoxShadow(
+                    color: theme.accentColor.withOpacity(0.25),
+                    blurRadius: 6,
+                    offset: const Offset(0, 1),
+                  ),
+                ]
+              : null,
         ),
         child: Icon(
           icon,
-          size: 19,
+          size: 18,
           color: isActive ? theme.accentColor : theme.secondaryTextColor,
         ),
       ),

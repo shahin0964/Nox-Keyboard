@@ -43,6 +43,13 @@ class ImePlatformBridge {
     });
   }
 
+  Future<void> updateKeyboardHeight(double height) async {
+    if (_isMockMode) return;
+    try {
+      await _imeChannel.invokeMethod('updateKeyboardHeight', {'height': height});
+    } catch (_) {}
+  }
+
   Future<void> commitText(String text) async {
     if (_isMockMode) {
       mockCommitCallback?.call(text);

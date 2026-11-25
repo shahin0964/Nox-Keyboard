@@ -18,13 +18,14 @@ class SuggestionsBarWidget extends StatelessWidget {
     final candidates = engine.candidates;
 
     return Container(
-      height: 42,
+      height: 44,
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
       decoration: BoxDecoration(
-        color: theme.suggestionBarColor,
+        color: theme.suggestionBarColor.withOpacity(theme.isDark ? 0.82 : 0.92),
         border: Border(
           bottom: BorderSide(
-            color: theme.textColor.withOpacity(0.08),
-            width: 0.5,
+            color: Colors.white.withOpacity(theme.isDark ? 0.06 : 0.15),
+            width: 0.8,
           ),
         ),
       ),
@@ -34,32 +35,9 @@ class SuggestionsBarWidget extends StatelessWidget {
               children: List.generate(candidates.length, (index) {
                 final c = candidates[index];
                 return Expanded(
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: InkWell(
-                          onTap: () => engine.selectSuggestion(c),
-                          child: Center(
-                            child: Text(
-                              c.text,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: c.isAutocorrect ? theme.accentColor : theme.textColor,
-                                fontSize: c.isAutocorrect ? 16 : 15,
-                                fontWeight: c.isAutocorrect ? FontWeight.bold : FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      if (index < candidates.length - 1)
-                        Container(
-                          width: 1,
-                          height: 18,
-                          color: theme.textColor.withOpacity(0.12),
-                        ),
-                    ],
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 3),
+                    child: _buildSuggestionPill(c),
                   ),
                 );
               }),
@@ -67,23 +45,80 @@ class SuggestionsBarWidget extends StatelessWidget {
     );
   }
 
+  Widget _buildSuggestionPill(SuggestionCandidate c) {
+    final isAutocorrect = c.isAutocorrect;
+
+    return InkWell(
+      onTap: () => engine.selectSuggestion(c),
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          color: isAutocorrect
+              ? theme.accentColor.withOpacity(0.18)
+              : theme.keyColor.withOpacity(theme.isDark ? 0.65 : 0.85),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isAutocorrect
+                ? theme.accentColor.withOpacity(0.65)
+                : Colors.white.withOpacity(theme.isDark ? 0.08 : 0.2),
+            width: isAutocorrect ? 1.2 : 0.8,
+          ),
+          boxShadow: isAutocorrect
+              ? [
+                  BoxShadow(
+                    color: theme.accentColor.withOpacity(0.18),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1),
+                  ),
+                ]
+              : null,
+        ),
+        child: Center(
+          child: Text(
+            c.text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: isAutocorrect ? theme.accentColor : theme.textColor,
+              fontSize: isAutocorrect ? 15 : 14.5,
+              fontWeight: isAutocorrect ? FontWeight.bold : FontWeight.w500,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildEmptyState(BuildContext context) {
     if (engine.isPassword) {
       return Center(
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.lock_outline, size: 14, color: theme.secondaryTextColor),
-            const SizedBox(width: 6),
-            Text(
-              'Password field (private mode)',
-              style: TextStyle(
-                color: theme.secondaryTextColor,
-                fontSize: 12,
-                fontWeight: FontWeight.w400,
-              ),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(theme.isDark ? 0.05 : 0.2),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: Colors.white.withOpacity(theme.isDark ? 0.08 : 0.16),
+              width: 0.8,
             ),
-          ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.lock_outline, size: 14, color: theme.secondaryTextColor),
+              const SizedBox(width: 6),
+              Text(
+                'Password field (secure mode)',
+                style: TextStyle(
+                  color: theme.secondaryTextColor,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -91,29 +126,38 @@ class SuggestionsBarWidget extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        _buildQuickPunctuation('.'),
-        _buildQuickPunctuation(','),
-        _buildQuickPunctuation('!'),
-        _buildQuickPunctuation('?'),
-        _buildQuickPunctuation('-'),
-        _buildQuickPunctuation('@'),
+        _buildPillPunctuation('.'),
+        _buildPillPunctuation(','),
+        _buildPillPunctuation('!'),
+        _buildPillPunctuation('?'),
+        _buildPillPunctuation('-'),
+        _buildPillPunctuation('@'),
       ],
     );
   }
 
-  Widget _buildQuickPunctuation(String p) {
+  Widget _buildPillPunctuation(String p) {
     return InkWell(
       onTap: () {
         engine.onKeyPress(
           engine.activePage.rows.first.keys.first.copyWith(primary: p),
         );
       },
+      borderRadius: BorderRadius.circular(16),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(theme.isDark ? 0.05 : 0.25),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: Colors.white.withOpacity(theme.isDark ? 0.07 : 0.18),
+            width: 0.8,
+          ),
+        ),
         child: Text(
           p,
           style: TextStyle(
-            color: theme.secondaryTextColor.withOpacity(0.8),
+            color: theme.secondaryTextColor.withOpacity(0.9),
             fontSize: 15,
             fontWeight: FontWeight.w600,
           ),

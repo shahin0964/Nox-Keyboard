@@ -52,8 +52,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
         with:
-          name: Nox Keyboard v1.0.0 Release
-          tag_name: v1.0.0
+          name: Nox Keyboard v1.0.1 Release
+          tag_name: v1.0.1
           files: build/app/outputs/flutter-apk/app-release.apk
           generate_release_notes: true
           draft: false

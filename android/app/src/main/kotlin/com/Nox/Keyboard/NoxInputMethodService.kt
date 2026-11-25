@@ -10,12 +10,15 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.Window
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.text.InputType
+import android.widget.FrameLayout
 import io.flutter.FlutterInjector
 import io.flutter.embedding.android.FlutterTextureView
 import io.flutter.embedding.android.FlutterView
@@ -26,10 +29,34 @@ import io.flutter.plugin.common.MethodChannel
 class NoxInputMethodService : InputMethodService() {
     private var flutterEngine: FlutterEngine? = null
     private var flutterView: FlutterView? = null
+    private var inputContainer: InputViewContainer? = null
     private var channel: MethodChannel? = null
 
     companion object {
         const val CHANNEL_NAME = "com.nox.keyboard/ime"
+    }
+
+    /**
+     * Custom FrameLayout container that enforces exact measured height for the Android IME window.
+     * Prevents FlutterView from expanding and taking over the entire screen.
+     */
+    class InputViewContainer(context: Context) : FrameLayout(context) {
+        var keyboardHeightPx: Int = (280 * context.resources.displayMetrics.density).toInt()
+
+        fun updateHeight(heightDp: Float) {
+            val newHeightPx = (heightDp * context.resources.displayMetrics.density).toInt()
+            if (keyboardHeightPx != newHeightPx) {
+                keyboardHeightPx = newHeightPx
+                requestLayout()
+            }
+        }
+
+        override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+            val width = MeasureSpec.getSize(widthMeasureSpec)
+            val heightSpec = MeasureSpec.makeMeasureSpec(keyboardHeightPx, MeasureSpec.EXACTLY)
+            super.onMeasure(widthMeasureSpec, heightSpec)
+            setMeasuredDimension(width, keyboardHeightPx)
+        }
     }
 
     override fun onCreate() {
@@ -198,23 +225,47 @@ class NoxInputMethodService : InputMethodService() {
                     val text = ic?.getTextAfterCursor(length, 0)?.toString() ?: ""
                     result.success(text)
                 }
+                "updateKeyboardHeight" -> {
+                    val heightDp = (call.argument<Double>("height") ?: 280.0).toFloat()
+                    inputContainer?.updateHeight(heightDp)
+                    result.success(true)
+                }
                 else -> result.notImplemented()
             }
         }
     }
 
+    override fun onConfigureWindow(win: Window, isFullscreen: Boolean, isCandidatesOnly: Boolean) {
+        super.onConfigureWindow(win, isFullscreen, isCandidatesOnly)
+        win.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        win.setGravity(Gravity.BOTTOM)
+    }
+
+    override fun onEvaluateFullscreenMode(): Boolean {
+        // Never allow full-screen extract mode; keep keyboard pinned to bottom
+        return false
+    }
+
+    override fun onEvaluateInputViewShown(): Boolean {
+        return true
+    }
+
     override fun onCreateInputView(): View {
         initFlutterEngine()
-        if (flutterView == null) {
+        if (inputContainer == null) {
+            inputContainer = InputViewContainer(this)
             val textureView = FlutterTextureView(this)
             flutterView = FlutterView(this, textureView)
             flutterView!!.attachToFlutterEngine(flutterEngine!!)
-            flutterView!!.layoutParams = ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
+            inputContainer!!.addView(
+                flutterView,
+                FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
             )
         }
-        return flutterView!!
+        return inputContainer!!
     }
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
@@ -282,7 +333,9 @@ class NoxInputMethodService : InputMethodService() {
 
     override fun onDestroy() {
         flutterView?.detachFromFlutterEngine()
+        inputContainer?.removeAllViews()
         flutterView = null
+        inputContainer = null
         flutterEngine?.destroy()
         flutterEngine = null
         super.onDestroy()
