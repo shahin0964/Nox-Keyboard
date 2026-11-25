@@ -412,7 +412,9 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
       );
     }
 
-    if (k.action == KeyAction.switchSymbols || k.action == KeyAction.switchSecondarySymbols) {
+    if (k.action == KeyAction.switchSymbols ||
+        k.action == KeyAction.switchMoreSymbols ||
+        k.action == KeyAction.switchLetters) {
       return Text(
         k.primary,
         style: TextStyle(
