@@ -15,7 +15,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
-import android.view.inputmethod.InputType
+import android.text.InputType
 import io.flutter.FlutterInjector
 import io.flutter.embedding.android.FlutterTextureView
 import io.flutter.embedding.android.FlutterView
