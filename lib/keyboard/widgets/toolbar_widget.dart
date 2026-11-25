@@ -73,7 +73,7 @@ class ToolbarWidget extends StatelessWidget {
                     onTap: () => engine.openPanel(KeyboardPanel.textEditing),
                   ),
                   _buildToolItem(
-                    icon: CupertinoIcons.paintpalette,
+                    icon: Icons.palette,
                     label: 'Themes',
                     isActive: engine.activePanel == KeyboardPanel.themes,
                     onTap: () => engine.openPanel(KeyboardPanel.themes),

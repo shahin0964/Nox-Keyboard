@@ -1,10 +1,15 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:nox_keyboard/keyboard/suggestions/dictionary_service.dart';
 import 'package:nox_keyboard/keyboard/suggestions/ngram_predictor.dart';
 import 'package:nox_keyboard/keyboard/suggestions/autocorrect_service.dart';
 import 'package:nox_keyboard/keyboard/suggestions/suggestion_engine.dart';
 
 void main() {
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
   group('Suggestions and Autocorrect Tests', () {
     test('DictionaryService prefix search', () {
       final service = DictionaryService();

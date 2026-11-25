@@ -54,7 +54,7 @@ class _ThemeGalleryScreenState extends State<ThemeGalleryScreen> {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             color: Theme.of(context).colorScheme.primary.withOpacity(0.08),
             child: ListTile(
-              leading: Icon(CupertinoIcons.paintpalette, color: Theme.of(context).colorScheme.primary, size: 28),
+              leading: Icon(Icons.palette, color: Theme.of(context).colorScheme.primary, size: 28),
               title: const Text('Custom Theme Builder', style: TextStyle(fontWeight: FontWeight.bold)),
               subtitle: const Text('Design your own colors, key radii, fonts & borders'),
               trailing: ElevatedButton(

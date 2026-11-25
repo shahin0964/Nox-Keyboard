@@ -127,7 +127,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 _buildActionCard(
                   title: 'Themes',
                   subtitle: theme.name,
-                  icon: CupertinoIcons.paintpalette_fill,
+                  icon: Icons.palette,
                   color: const Color(0xFF8B5CF6),
                   route: '/themes',
                 ),
