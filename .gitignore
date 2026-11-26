@@ -36,5 +36,6 @@ migrate_working_dir/
 **/android/**/GeneratedPluginRegistrant.java
 **/android/key.properties
 *.jks
+*.keystore
 output/
 *.apk
