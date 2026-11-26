@@ -17,6 +17,7 @@ class DictionaryService {
     list.addAll(PreferencesHelper().userDictionary);
 
     switch (languageCode) {
+      case 'bn_avro':
       case 'bn_BD':
         list.addAll(BnBdDictionary.words);
         break;

@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import '../../../app/widgets/modern_ui.dart';
 import '../../../data/preferences_helper.dart';
 
 class TypingSettingsScreen extends StatefulWidget {
@@ -40,159 +41,291 @@ class _TypingSettingsScreenState extends State<TypingSettingsScreen> {
     _soundOnKeypress = _prefs.soundOnKeypress;
     _vibrateOnKeypress = _prefs.vibrateOnKeypress;
     _vibrationIntensity = _prefs.vibrationIntensity;
-    _keyboardHeight = _prefs.keyboardHeight;
+    _keyboardHeight = _prefs.keyboardHeight.clamp(220.0, 340.0);
     _showNumberRow = _prefs.showNumberRow;
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Typing & Smart Features', style: TextStyle(fontWeight: FontWeight.bold)),
-      ),
+    return ModernScaffold(
+      title: 'Typing & Smart Settings',
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        physics: const BouncingScrollPhysics(),
         children: [
-          // Smart Text Input section
-          _buildSectionHeader('Smart Typing & Corrections'),
-          SwitchListTile(
-            title: const Text('Autocorrection'),
-            subtitle: const Text('Correct words automatically when pressing space'),
-            value: _autoCorrection,
-            onChanged: (val) async {
-              await _prefs.setAutoCorrection(val);
-              setState(() => _autoCorrection = val);
-            },
-          ),
-          SwitchListTile(
-            title: const Text('Next-Word Prediction'),
-            subtitle: const Text('Predict likely upcoming words based on typed context'),
-            value: _nextWordPrediction,
-            onChanged: (val) async {
-              await _prefs.setNextWordPrediction(val);
-              setState(() => _nextWordPrediction = val);
-            },
-          ),
-          SwitchListTile(
-            title: const Text('Auto-Capitalization'),
-            subtitle: const Text('Capitalize the first word of each sentence'),
-            value: _autoCapitalization,
-            onChanged: (val) async {
-              await _prefs.setAutoCapitalization(val);
-              setState(() => _autoCapitalization = val);
-            },
-          ),
-          SwitchListTile(
-            title: const Text('Double-Space Period'),
-            subtitle: const Text('Double-tapping space inserts a period and space'),
-            value: _doubleSpacePeriod,
-            onChanged: (val) async {
-              await _prefs.setDoubleSpacePeriod(val);
-              setState(() => _doubleSpacePeriod = val);
-            },
-          ),
-          SwitchListTile(
-            title: const Text('Show Suggestions Bar'),
-            subtitle: const Text('Display word candidates and autocorrect bar'),
-            value: _showSuggestionsBar,
-            onChanged: (val) async {
-              await _prefs.setShowSuggestionsBar(val);
-              setState(() => _showSuggestionsBar = val);
-            },
-          ),
-
-          const Divider(height: 32),
-
-          // Feedback & Preferences
-          _buildSectionHeader('Keypress Feedback & Layout'),
-          SwitchListTile(
-            title: const Text('Key Press Popup'),
-            subtitle: const Text('Show visual character bubble above pressed key'),
-            value: _popupOnKeypress,
-            onChanged: (val) async {
-              await _prefs.setPopupOnKeypress(val);
-              setState(() => _popupOnKeypress = val);
-            },
-          ),
-          SwitchListTile(
-            title: const Text('Sound on Keypress'),
-            subtitle: const Text('Play subtle click audio on each keystroke'),
-            value: _soundOnKeypress,
-            onChanged: (val) async {
-              await _prefs.setSoundOnKeypress(val);
-              setState(() => _soundOnKeypress = val);
-            },
-          ),
-          SwitchListTile(
-            title: const Text('Vibration on Keypress'),
-            subtitle: const Text('Tactile haptic feedback on keypress'),
-            value: _vibrateOnKeypress,
-            onChanged: (val) async {
-              await _prefs.setVibrateOnKeypress(val);
-              setState(() => _vibrateOnKeypress = val);
-            },
-          ),
-          if (_vibrateOnKeypress) ...[
-            ListTile(
-              title: const Text('Vibration Intensity'),
-              subtitle: Text('$_vibrationIntensity ms duration'),
+          const ModernSectionHeader(title: 'Smart Typing & Corrections'),
+          GlassCard(
+            child: Column(
+              children: [
+                ModernSwitchTile(
+                  icon: CupertinoIcons.wand_stars,
+                  iconColor: const Color(0xFF00E5FF),
+                  title: 'Autocorrection',
+                  subtitle: 'Correct words automatically when pressing space',
+                  value: _autoCorrection,
+                  onChanged: (val) async {
+                    await _prefs.setAutoCorrection(val);
+                    setState(() => _autoCorrection = val);
+                  },
+                ),
+                _glassDivider(),
+                ModernSwitchTile(
+                  icon: CupertinoIcons.sparkles,
+                  iconColor: const Color(0xFFA855F7),
+                  title: 'Next-Word Prediction',
+                  subtitle: 'Predict likely upcoming words from context',
+                  value: _nextWordPrediction,
+                  onChanged: (val) async {
+                    await _prefs.setNextWordPrediction(val);
+                    setState(() => _nextWordPrediction = val);
+                  },
+                ),
+                _glassDivider(),
+                ModernSwitchTile(
+                  icon: CupertinoIcons.arrow_up_square_fill,
+                  iconColor: const Color(0xFF38BDF8),
+                  title: 'Auto-Capitalization',
+                  subtitle: 'Capitalize the first word of each sentence',
+                  value: _autoCapitalization,
+                  onChanged: (val) async {
+                    await _prefs.setAutoCapitalization(val);
+                    setState(() => _autoCapitalization = val);
+                  },
+                ),
+                _glassDivider(),
+                ModernSwitchTile(
+                  icon: CupertinoIcons.textformat,
+                  iconColor: const Color(0xFF10B981),
+                  title: 'Double-Space Period',
+                  subtitle: 'Double-tapping space inserts "." and space',
+                  value: _doubleSpacePeriod,
+                  onChanged: (val) async {
+                    await _prefs.setDoubleSpacePeriod(val);
+                    setState(() => _doubleSpacePeriod = val);
+                  },
+                ),
+                _glassDivider(),
+                ModernSwitchTile(
+                  icon: CupertinoIcons.text_bubble_fill,
+                  iconColor: const Color(0xFFF59E0B),
+                  title: 'Show Suggestions Bar',
+                  subtitle: 'Show live word & Avro candidates above keys',
+                  value: _showSuggestionsBar,
+                  onChanged: (val) async {
+                    await _prefs.setShowSuggestionsBar(val);
+                    setState(() => _showSuggestionsBar = val);
+                  },
+                ),
+              ],
             ),
-            Slider(
-              value: _vibrationIntensity.toDouble(),
-              min: 5,
-              max: 50,
-              divisions: 9,
-              onChanged: (val) async {
-                final intVal = val.toInt();
-                await _prefs.setVibrationIntensity(intVal);
-                setState(() => _vibrationIntensity = intVal);
-              },
+          ),
+
+          const SizedBox(height: 18),
+
+          const ModernSectionHeader(title: 'Keypress Feedback & Layout', accentColor: Color(0xFFA855F7)),
+          GlassCard(
+            child: Column(
+              children: [
+                ModernSwitchTile(
+                  icon: CupertinoIcons.chat_bubble_text_fill,
+                  iconColor: const Color(0xFF38BDF8),
+                  title: 'Key Press Bubble Popup',
+                  subtitle: 'Show floating letter bubble above pressed keys',
+                  value: _popupOnKeypress,
+                  onChanged: (val) async {
+                    await _prefs.setPopupOnKeypress(val);
+                    setState(() => _popupOnKeypress = val);
+                  },
+                ),
+                _glassDivider(),
+                ModernSwitchTile(
+                  icon: CupertinoIcons.speaker_2_fill,
+                  iconColor: const Color(0xFF10B981),
+                  title: 'Sound on Keypress',
+                  subtitle: 'Play crisp click audio on every tap',
+                  value: _soundOnKeypress,
+                  onChanged: (val) async {
+                    await _prefs.setSoundOnKeypress(val);
+                    setState(() => _soundOnKeypress = val);
+                  },
+                ),
+                _glassDivider(),
+                ModernSwitchTile(
+                  icon: CupertinoIcons.waveform,
+                  iconColor: const Color(0xFFEC4899),
+                  title: 'Haptic Vibration',
+                  subtitle: 'Tactile feedback when pressing keys',
+                  value: _vibrateOnKeypress,
+                  onChanged: (val) async {
+                    await _prefs.setVibrateOnKeypress(val);
+                    setState(() => _vibrateOnKeypress = val);
+                  },
+                ),
+                if (_vibrateOnKeypress) ...[
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Vibration Strength',
+                              style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.7)),
+                            ),
+                            _valuePill('$_vibrationIntensity ms', const Color(0xFFEC4899)),
+                          ],
+                        ),
+                        Slider(
+                          value: _vibrationIntensity.toDouble(),
+                          min: 5,
+                          max: 50,
+                          divisions: 9,
+                          activeColor: const Color(0xFFEC4899),
+                          onChanged: (val) async {
+                            final intVal = val.toInt();
+                            await _prefs.setVibrationIntensity(intVal);
+                            setState(() => _vibrationIntensity = intVal);
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                _glassDivider(),
+                ModernSwitchTile(
+                  icon: CupertinoIcons.number_square_fill,
+                  iconColor: const Color(0xFFF59E0B),
+                  title: 'Dedicated Number Row',
+                  subtitle: 'Always show 0–9 digits row above letters',
+                  value: _showNumberRow,
+                  onChanged: (val) async {
+                    await _prefs.setShowNumberRow(val);
+                    setState(() => _showNumberRow = val);
+                  },
+                ),
+              ],
             ),
-          ],
-          SwitchListTile(
-            title: const Text('Dedicated Number Row'),
-            subtitle: const Text('Always show 0-9 digits row above letters'),
-            value: _showNumberRow,
-            onChanged: (val) async {
-              await _prefs.setShowNumberRow(val);
-              setState(() => _showNumberRow = val);
-            },
           ),
 
-          const Divider(height: 32),
+          const SizedBox(height: 18),
 
-          // Sizing
-          _buildSectionHeader('Keyboard Height & Sizing'),
-          ListTile(
-            title: const Text('Keyboard Height'),
-            subtitle: Text('${_keyboardHeight.toStringAsFixed(0)} dp'),
+          const ModernSectionHeader(title: 'Keyboard Size (Small ↔ Large)', accentColor: Color(0xFF10B981)),
+          GlassCard(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        const ModernIconBadge(
+                          icon: CupertinoIcons.arrow_up_down,
+                          color: Color(0xFF10B981),
+                          size: 18,
+                        ),
+                        const SizedBox(width: 12),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Keyboard Height',
+                              style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: Colors.white),
+                            ),
+                            Text(
+                              'Tap preset or drag slider to resize',
+                              style: TextStyle(fontSize: 11.5, color: Colors.white.withOpacity(0.5)),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    _valuePill('${_keyboardHeight.toStringAsFixed(0)} dp', const Color(0xFF10B981)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    _sizePresetBtn('Small', 235.0),
+                    const SizedBox(width: 8),
+                    _sizePresetBtn('Normal', 275.0),
+                    const SizedBox(width: 8),
+                    _sizePresetBtn('Large', 305.0),
+                    const SizedBox(width: 8),
+                    _sizePresetBtn('XL', 335.0),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Slider(
+                  value: _keyboardHeight,
+                  min: 220,
+                  max: 340,
+                  activeColor: const Color(0xFF10B981),
+                  onChanged: (val) async {
+                    await _prefs.setKeyboardHeight(val);
+                    setState(() => _keyboardHeight = val);
+                  },
+                ),
+              ],
+            ),
           ),
-          Slider(
-            value: _keyboardHeight,
-            min: 220,
-            max: 340,
-            onChanged: (val) async {
-              await _prefs.setKeyboardHeight(val);
-              setState(() => _keyboardHeight = val);
-            },
-          ),
+
           const SizedBox(height: 24),
         ],
       ),
     );
   }
 
-  Widget _buildSectionHeader(String title) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Text(
-        title.toUpperCase(),
-        style: TextStyle(
-          color: Theme.of(context).colorScheme.primary,
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
-          letterSpacing: 1.0,
+  Widget _sizePresetBtn(String label, double heightVal) {
+    final isSelected = (_keyboardHeight - heightVal).abs() < 10;
+    return Expanded(
+      child: InkWell(
+        onTap: () async {
+          await _prefs.setKeyboardHeight(heightVal);
+          setState(() => _keyboardHeight = heightVal);
+        },
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 7),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? const Color(0xFF10B981).withOpacity(0.24)
+                : Colors.white.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isSelected ? const Color(0xFF10B981) : Colors.white.withOpacity(0.1),
+            ),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isSelected ? const Color(0xFF34D399) : Colors.white70,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
         ),
+      ),
+    );
+  }
+
+  Widget _glassDivider() {
+    return Divider(height: 1, indent: 60, color: Colors.white.withOpacity(0.06));
+  }
+
+  Widget _valuePill(String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.18),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withOpacity(0.45)),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.bold),
       ),
     );
   }

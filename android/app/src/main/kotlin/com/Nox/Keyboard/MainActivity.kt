@@ -49,6 +49,21 @@ class MainActivity : FlutterActivity() {
             intent.removeExtra("requestAudioPermission")
             requestAudioPermission()
         }
+        if (intent.getBooleanExtra("requestMediaPermission", false)) {
+            intent.removeExtra("requestMediaPermission")
+            requestMediaPermission()
+        }
+    }
+
+    private fun requestMediaPermission() {
+        val perm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            Manifest.permission.READ_MEDIA_IMAGES
+        } else {
+            Manifest.permission.READ_EXTERNAL_STORAGE
+        }
+        if (ContextCompat.checkSelfPermission(this, perm) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, arrayOf(perm), 1002)
+        }
     }
 
     private fun requestAudioPermission() {

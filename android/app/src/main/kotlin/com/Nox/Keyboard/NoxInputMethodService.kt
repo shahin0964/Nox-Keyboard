@@ -2,12 +2,14 @@ package com.Nox.Keyboard
 
 import android.Manifest
 import android.content.ClipData
+import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.inputmethodservice.InputMethodService
 import android.media.AudioManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -15,6 +17,7 @@ import android.os.Looper
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.provider.MediaStore
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -29,12 +32,18 @@ import android.view.inputmethod.InputMethodManager
 import android.text.InputType
 import android.widget.FrameLayout
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
+import androidx.core.view.inputmethod.EditorInfoCompat
+import androidx.core.view.inputmethod.InputConnectionCompat
+import androidx.core.view.inputmethod.InputContentInfoCompat
 import io.flutter.FlutterInjector
 import io.flutter.embedding.android.FlutterTextureView
 import io.flutter.embedding.android.FlutterView
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.dart.DartExecutor
 import io.flutter.plugin.common.MethodChannel
+import java.io.File
+import java.io.FileOutputStream
 
 class NoxInputMethodService : InputMethodService() {
     private var flutterEngine: FlutterEngine? = null
@@ -42,6 +51,7 @@ class NoxInputMethodService : InputMethodService() {
     private var inputContainer: InputViewContainer? = null
     private var channel: MethodChannel? = null
     private var speechRecognizer: SpeechRecognizer? = null
+    private var currentEditorInfo: EditorInfo? = null
     private val mainHandler = Handler(Looper.getMainLooper())
 
     companion object {
@@ -236,6 +246,29 @@ class NoxInputMethodService : InputMethodService() {
                     startActivity(intent)
                     result.success(true)
                 }
+                "getMediaClipboardState" -> {
+                    val img = captureClipboardImagePath() ?: ""
+                    val ss = getRecentScreenshotPath() ?: ""
+                    result.success(hashMapOf(
+                        "hasPermission" to hasMediaPermission(),
+                        "clipboardImagePath" to img,
+                        "screenshotPath" to ss
+                    ))
+                }
+                "commitImage" -> {
+                    val path = call.argument<String>("path") ?: ""
+                    val status = commitImagePath(path, ic)
+                    result.success(status)
+                }
+                "requestMediaPermission" -> {
+                    requestHideSelf(0)
+                    val intent = Intent(this@NoxInputMethodService, MainActivity::class.java).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                        putExtra("requestMediaPermission", true)
+                    }
+                    startActivity(intent)
+                    result.success(true)
+                }
                 "getClipboardText" -> {
                     try {
                         val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -361,6 +394,7 @@ class NoxInputMethodService : InputMethodService() {
         super.onStartInputView(info, restarting)
         flutterEngine?.lifecycleChannel?.appIsResumed()
         flutterView?.invalidate()
+        currentEditorInfo = info
         if (info == null) return
 
         val inputType = info.inputType
@@ -393,6 +427,8 @@ class NoxInputMethodService : InputMethodService() {
             ""
         }
 
+        val clipboardImagePath = captureClipboardImagePath() ?: getRecentScreenshotPath() ?: ""
+
         val data = hashMapOf<String, Any>(
             "inputType" to inputType,
             "imeOptions" to imeOptions,
@@ -405,7 +441,8 @@ class NoxInputMethodService : InputMethodService() {
             "isUri" to isUri,
             "textBeforeCursor" to beforeText,
             "navBarHeightDp" to navBarDp,
-            "clipboardText" to clipboardText
+            "clipboardText" to clipboardText,
+            "clipboardImagePath" to clipboardImagePath
         )
 
         channel?.invokeMethod("onStartInput", data)
@@ -449,7 +486,7 @@ class NoxInputMethodService : InputMethodService() {
         }
 
         val localeTag = when (languageCode) {
-            "bn_BD" -> "bn-BD"
+            "bn_avro", "bn_BD" -> "bn-BD"
             "hi" -> "hi-IN"
             "ar" -> "ar-SA"
             "ur" -> "ur-PK"
@@ -517,6 +554,129 @@ class NoxInputMethodService : InputMethodService() {
             try {
                 speechRecognizer?.stopListening()
             } catch (_: Exception) {}
+        }
+    }
+
+    private fun hasMediaPermission(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED
+        } else {
+            ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+        }
+    }
+
+    private fun getClipImagesDir(): File {
+        val dir = File(cacheDir, "clip_images")
+        if (!dir.exists()) dir.mkdirs()
+        return dir
+    }
+
+    private fun copyUriToCache(uri: Uri, prefix: String): String? {
+        return try {
+            val mime = contentResolver.getType(uri) ?: "image/png"
+            val ext = if (mime.contains("png", true)) "png" else "jpg"
+            val name = "${prefix}_${uri.toString().hashCode().toUInt()}.$ext"
+            val outFile = File(getClipImagesDir(), name)
+            if (outFile.exists() && outFile.length() > 0) {
+                return outFile.absolutePath
+            }
+            contentResolver.openInputStream(uri)?.use { input ->
+                FileOutputStream(outFile).use { output ->
+                    val buffer = ByteArray(8192)
+                    var total = 0
+                    while (true) {
+                        val read = input.read(buffer)
+                        if (read == -1) break
+                        total += read
+                        if (total > 6 * 1024 * 1024) break // cap at 6MB
+                        output.write(buffer, 0, read)
+                    }
+                }
+            }
+            if (outFile.exists() && outFile.length() > 0) outFile.absolutePath else null
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun captureClipboardImagePath(): String? {
+        return try {
+            val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val clip = cm.primaryClip ?: return null
+            if (clip.itemCount == 0) return null
+            val uri = clip.getItemAt(0).uri ?: return null
+            val mime = contentResolver.getType(uri) ?: ""
+            if (mime.startsWith("image/") || clip.description.hasMimeType("image/*")) {
+                copyUriToCache(uri, "clip")
+            } else null
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun getRecentScreenshotPath(): String? {
+        if (!hasMediaPermission()) return null
+        return try {
+            val cutoffSec = (System.currentTimeMillis() / 1000L) - (30 * 60)
+            val projection = arrayOf(
+                MediaStore.Images.Media._ID,
+                MediaStore.Images.Media.DISPLAY_NAME,
+                MediaStore.Images.Media.DATE_ADDED
+            )
+            val selection = "${MediaStore.Images.Media.DATE_ADDED} >= ? AND LOWER(${MediaStore.Images.Media.DISPLAY_NAME}) LIKE ?"
+            val selectionArgs = arrayOf(cutoffSec.toString(), "%screenshot%")
+            val sortOrder = "${MediaStore.Images.Media.DATE_ADDED} DESC"
+            contentResolver.query(
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                projection,
+                selection,
+                selectionArgs,
+                sortOrder
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID))
+                    val uri = Uri.withAppendedPath(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id.toString())
+                    return copyUriToCache(uri, "ss_$id")
+                }
+            }
+            null
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun commitImagePath(path: String, ic: android.view.inputmethod.InputConnection?): String {
+        if (path.isEmpty() || ic == null) return "FAILED"
+        val file = File(path)
+        if (!file.exists()) return "MISSING"
+        return try {
+            val uri = FileProvider.getUriForFile(this, "${packageName}.fileprovider", file)
+            val mime = if (path.endsWith(".png", true)) "image/png" else "image/jpeg"
+            val info = currentEditorInfo
+            val supportedTypes = if (info != null) EditorInfoCompat.getContentMimeTypes(info) else emptyArray()
+            val acceptsImage = supportedTypes.any {
+                ClipDescription.compareMimeTypes(mime, it) || it == "image/*" || it == "*/*"
+            }
+            if (info != null && acceptsImage) {
+                val contentInfo = InputContentInfoCompat(
+                    uri,
+                    ClipDescription("Nox Clipboard Image", arrayOf(mime)),
+                    null
+                )
+                val ok = InputConnectionCompat.commitContent(
+                    ic,
+                    info,
+                    contentInfo,
+                    InputConnectionCompat.INPUT_CONTENT_GRANT_READ_URI_PERMISSION,
+                    null
+                )
+                if (ok) return "COMMITTED"
+            }
+            val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            cm.setPrimaryClip(ClipData.newUri(contentResolver, "Nox Image", uri))
+            "COPIED_ONLY"
+        } catch (_: Exception) {
+            "FAILED"
         }
     }
 

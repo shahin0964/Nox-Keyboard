@@ -21,6 +21,7 @@ class NgramPredictor {
 
     Map<String, List<String>> bigramMap;
     switch (languageCode) {
+      case 'bn_avro':
       case 'bn_BD':
         bigramMap = BnBdDictionary.bigrams;
         break;

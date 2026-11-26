@@ -31,6 +31,11 @@ class AppConstants {
   static const String keyRecentEmojis = 'recent_emojis';
   static const String keyCustomThemes = 'custom_themes';
   static const String keyUserDictionary = 'user_dictionary';
+  static const String keyCustomShortcuts = 'custom_shortcuts';
+  static const String keyDictionarySeeded = 'dictionary_seeded';
+  static const String keyLearnedWordFreq = 'learned_word_freq';
+  static const String keyLearnedBigrams = 'learned_bigrams';
+  static const String keyImageClips = 'image_clips';
   static const String keyOnboardingCompleted = 'onboarding_completed';
 
   // Default Values

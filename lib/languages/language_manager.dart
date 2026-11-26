@@ -10,7 +10,7 @@ class LanguageManager extends ChangeNotifier {
   LanguageModel _currentLanguage = LanguageModel.bangla;
   LanguageModel get currentLanguage => _currentLanguage;
 
-  List<String> _enabledLanguageCodes = ['bn_BD', 'en_US', 'hi', 'ar', 'ur'];
+  List<String> _enabledLanguageCodes = ['en_US', 'bn_avro', 'bn_BD', 'hi', 'ar', 'ur'];
   List<String> get enabledLanguageCodes => _enabledLanguageCodes;
 
   bool _isBanglaPhonetic = true;

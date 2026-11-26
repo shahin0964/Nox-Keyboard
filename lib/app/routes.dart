@@ -10,6 +10,7 @@ import '../features/customization/screens/theme_gallery_screen.dart';
 import '../features/customization/screens/theme_editor_screen.dart';
 import '../features/settings/screens/typing_settings_screen.dart';
 import '../features/settings/screens/dictionary_settings_screen.dart';
+import '../features/settings/screens/shortcuts_screen.dart';
 import '../features/clipboard/screens/clipboard_screen.dart';
 import '../features/emoji/screens/emoji_screen.dart';
 import '../features/voice/screens/voice_typing_screen.dart';
@@ -29,6 +30,7 @@ class AppRoutes {
   static const String themeEditor = '/theme-editor';
   static const String typingSettings = '/typing-settings';
   static const String dictionarySettings = '/dictionary-settings';
+  static const String shortcuts = '/shortcuts';
   static const String clipboard = '/clipboard';
   static const String emojiSettings = '/emoji-settings';
   static const String voiceSettings = '/voice-settings';
@@ -47,6 +49,7 @@ class AppRoutes {
     themeEditor: (context) => const ThemeEditorScreen(),
     typingSettings: (context) => const TypingSettingsScreen(),
     dictionarySettings: (context) => const DictionarySettingsScreen(),
+    shortcuts: (context) => const ShortcutsScreen(),
     clipboard: (context) => const ClipboardScreen(),
     emojiSettings: (context) => const EmojiSettingsScreen(),
     voiceSettings: (context) => const VoiceTypingScreen(),

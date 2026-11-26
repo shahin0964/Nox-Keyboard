@@ -310,6 +310,33 @@ class ImePlatformBridge {
     } catch (_) {}
   }
 
+  Future<Map<String, dynamic>> getMediaClipboardState() async {
+    if (_isMockMode) return {};
+    try {
+      final res = await _imeChannel.invokeMethod<Map<dynamic, dynamic>>('getMediaClipboardState');
+      if (res != null) {
+        return Map<String, dynamic>.from(res);
+      }
+    } catch (_) {}
+    return {};
+  }
+
+  Future<String> commitImage(String path) async {
+    if (_isMockMode) return 'UNSUPPORTED';
+    try {
+      final res = await _imeChannel.invokeMethod<String>('commitImage', {'path': path});
+      return res ?? 'FAILED';
+    } catch (_) {
+      return 'FAILED';
+    }
+  }
+
+  Future<void> requestMediaPermissionFromSettings() async {
+    try {
+      await _imeChannel.invokeMethod('requestMediaPermission');
+    } catch (_) {}
+  }
+
   Future<String?> getInitialRouteExtra() async {
     try {
       return await _appChannel.invokeMethod<String>('getInitialRouteExtra');

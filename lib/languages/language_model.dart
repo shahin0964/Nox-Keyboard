@@ -33,13 +33,22 @@ class LanguageModel {
     hasPhonetic: false,
   );
 
-  static const LanguageModel bangla = LanguageModel(
-    code: 'bn_BD',
-    name: 'Bangla (Bangladesh)',
-    nativeName: 'বাংলা',
+  static const LanguageModel banglaAvro = LanguageModel(
+    code: 'bn_avro',
+    name: 'Bangla (Avro Phonetic)',
+    nativeName: 'বাংলা (অভ্র)',
     flag: '🇧🇩',
     isRtl: false,
     hasPhonetic: true,
+  );
+
+  static const LanguageModel bangla = LanguageModel(
+    code: 'bn_BD',
+    name: 'Bangla (National / Probhat)',
+    nativeName: 'বাংলা (প্রভাত)',
+    flag: '🇧🇩',
+    isRtl: false,
+    hasPhonetic: false,
   );
 
   static const LanguageModel hindi = LanguageModel(
@@ -70,6 +79,7 @@ class LanguageModel {
   );
 
   static List<LanguageModel> get supportedLanguages => [
+    banglaAvro,
     bangla,
     englishUs,
     englishUk,

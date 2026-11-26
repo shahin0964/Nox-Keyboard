@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../../themes/theme_model.dart';
@@ -14,12 +15,18 @@ class KeyboardKeyWidget extends StatefulWidget {
   final KeyboardKey keyboardKey;
   final NoxKeyboardTheme theme;
   final KeyboardEngine engine;
+  final double animValue;
+  final int colIndex;
+  final int rowIndex;
 
   const KeyboardKeyWidget({
     super.key,
     required this.keyboardKey,
     required this.theme,
     required this.engine,
+    this.animValue = 0.0,
+    this.colIndex = 0,
+    this.rowIndex = 0,
   });
 
   @override
@@ -266,10 +273,15 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
     final k = widget.keyboardKey;
     if (k.action == KeyAction.character) {
       final distance = (event.position - _pointerDownPosition).distance;
-      if (distance < 20 && !_hasTriggeredLongPress) {
+      if (distance < 42 && !_hasTriggeredLongPress) {
         final charToCommit = _getEffectiveChar();
         widget.engine.onKeyPress(k.copyWith(primary: charToCommit));
       }
+    } else if (k.action == KeyAction.space) {
+      if (!_hasDraggedSpace && !_hasTriggeredLongPress) {
+        widget.engine.onKeyPress(k);
+      }
+      widget.engine.onSpaceDragEnd(DragEndDetails());
     }
   }
 
@@ -281,70 +293,173 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
     final isEnter = k.action == KeyAction.enter;
 
     final isShiftActive = isShift && (widget.engine.isShifted || widget.engine.isCapsLock);
+    final shape = widget.theme.keyShape;
+    final animType = widget.theme.animationType;
 
-    // Pill styling for action keys
-    final double borderRadius = isSpecial
-        ? 22.0
-        : widget.theme.keyBorderRadius;
+    // Distinct key geometry per theme style
+    double borderRadius;
+    if (isSpecial && shape != 'cyber_sharp' && shape != 'mechanical_3d') {
+      borderRadius = 22.0;
+    } else {
+      switch (shape) {
+        case 'pill':
+          borderRadius = 22.0;
+          break;
+        case 'soft_blob':
+          borderRadius = 16.0;
+          break;
+        case 'cyber_sharp':
+          borderRadius = 4.0;
+          break;
+        case 'mechanical_3d':
+          borderRadius = 7.0;
+          break;
+        case 'glass_frost':
+          borderRadius = 12.0;
+          break;
+        case 'neon_outline':
+          borderRadius = 10.0;
+          break;
+        default:
+          borderRadius = widget.theme.keyBorderRadius;
+      }
+    }
+
+    // Dynamic animated accent color
+    Color dynamicAccent = widget.theme.accentColor;
+    if (animType == 'rgb_wave') {
+      final hue = (widget.animValue * 360.0 + widget.colIndex * 24.0 + widget.rowIndex * 18.0) % 360.0;
+      dynamicAccent = HSVColor.fromAHSV(1.0, hue, 0.88, 1.0).toColor();
+    } else if (animType == 'cyber_scan') {
+      final phase = (math.sin((widget.animValue * 2 * math.pi) - widget.colIndex * 0.45) + 1) * 0.5;
+      dynamicAccent = Color.lerp(
+            const Color(0xFFFF2A85),
+            const Color(0xFF00E5FF),
+            phase,
+          ) ??
+          widget.theme.accentColor;
+    } else if (animType == 'aurora' && widget.theme.gradientColors.length >= 2) {
+      final phase = (math.sin((widget.animValue * 2 * math.pi) + widget.colIndex * 0.35) + 1) * 0.5;
+      dynamicAccent = Color.lerp(
+            widget.theme.gradientColors[0],
+            widget.theme.gradientColors[1],
+            phase,
+          ) ??
+          widget.theme.accentColor;
+    } else if (animType == 'shimmer') {
+      final wavePos = widget.animValue * 14.0 - 2.0;
+      final dist = (widget.colIndex + widget.rowIndex * 0.6 - wavePos).abs();
+      final glow = (1.0 - (dist / 2.6)).clamp(0.0, 1.0);
+      dynamicAccent = Color.lerp(widget.theme.accentColor, Colors.white, glow * 0.55) ?? widget.theme.accentColor;
+    } else if (animType == 'pulse_glow') {
+      final pulse = (math.sin(widget.animValue * 2 * math.pi) + 1) * 0.5;
+      dynamicAccent = Color.lerp(
+            widget.theme.accentColor.withOpacity(0.55),
+            widget.theme.accentColor,
+            pulse,
+          ) ??
+          widget.theme.accentColor;
+    }
 
     Color bg;
     if (isShiftActive) {
-      bg = widget.theme.accentColor.withOpacity(0.35);
+      bg = dynamicAccent.withOpacity(0.35);
     } else if (isEnter) {
       bg = _isPressed
-          ? widget.theme.accentColor.withOpacity(0.4)
-          : widget.theme.accentColor.withOpacity(0.22);
+          ? dynamicAccent.withOpacity(0.42)
+          : dynamicAccent.withOpacity(0.24);
+    } else if (shape == 'neon_outline') {
+      bg = _isPressed
+          ? dynamicAccent.withOpacity(0.25)
+          : widget.theme.keyColor.withOpacity(0.35);
+    } else if (shape == 'glass_frost') {
+      bg = (_isPressed ? widget.theme.keyPressedColor : widget.theme.keyColor)
+          .withOpacity(isSpecial ? 0.58 : 0.72);
     } else if (isSpecial) {
       bg = _isPressed ? widget.theme.actionKeyPressedColor : widget.theme.actionKeyColor;
     } else {
       bg = _isPressed ? widget.theme.keyPressedColor : widget.theme.keyColor;
     }
 
+    Color borderCol;
+    double borderWidth;
+    if (isEnter) {
+      borderCol = dynamicAccent.withOpacity(0.8);
+      borderWidth = 1.3;
+    } else if (animType == 'rgb_wave' || animType == 'cyber_scan' || shape == 'neon_outline') {
+      borderCol = dynamicAccent.withOpacity(_isPressed ? 0.95 : 0.62);
+      borderWidth = widget.theme.keyBorderWidth > 0 ? widget.theme.keyBorderWidth : 1.1;
+    } else if (animType == 'aurora' || animType == 'pulse_glow' || animType == 'shimmer') {
+      borderCol = dynamicAccent.withOpacity(_isPressed ? 0.85 : 0.42);
+      borderWidth = 1.0;
+    } else if (widget.theme.keyBorderWidth > 0) {
+      borderCol = widget.theme.keyBorderColor;
+      borderWidth = widget.theme.keyBorderWidth;
+    } else {
+      borderCol = Colors.white.withOpacity(widget.theme.isDark ? 0.09 : 0.22);
+      borderWidth = 0.8;
+    }
+
     Widget content = _buildKeyContent(k, isShiftActive);
 
-    // Key container with visible scale bounce animation on tap
+    final bool isMech3D = shape == 'mechanical_3d';
+    final double pressDepthOffset = (isMech3D && _isPressed) ? 2.0 : 0.0;
+
+    // Key container with visible scale bounce animation on tap & theme-specific styling
     Widget keyContainer = AnimatedScale(
       scale: _isPressed ? 0.90 : 1.0,
-      duration: const Duration(milliseconds: 60),
+      duration: const Duration(milliseconds: 55),
       curve: Curves.easeOutCubic,
       child: Container(
-        margin: EdgeInsets.symmetric(
-          horizontal: widget.theme.keyMarginH,
-          vertical: widget.theme.keyMarginV,
+        margin: EdgeInsets.only(
+          left: widget.theme.keyMarginH,
+          right: widget.theme.keyMarginH,
+          top: widget.theme.keyMarginV + pressDepthOffset,
+          bottom: (widget.theme.keyMarginV - pressDepthOffset).clamp(1.0, 12.0),
         ),
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(borderRadius),
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              _isPressed
-                  ? Colors.transparent
-                  : Colors.white.withOpacity(widget.theme.isDark ? 0.06 : 0.4),
-              Colors.transparent,
-            ],
-          ),
-          border: Border.all(
-            color: isEnter
-                ? widget.theme.accentColor.withOpacity(0.6)
-                : (widget.theme.keyBorderWidth > 0
-                    ? widget.theme.keyBorderColor
-                    : Colors.white.withOpacity(widget.theme.isDark ? 0.08 : 0.18)),
-            width: isEnter ? 1.2 : (widget.theme.keyBorderWidth > 0 ? widget.theme.keyBorderWidth : 0.8),
-          ),
+          gradient: shape == 'neon_outline'
+              ? null
+              : LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    _isPressed
+                        ? Colors.transparent
+                        : Colors.white.withOpacity(
+                            shape == 'glass_frost'
+                                ? 0.16
+                                : (widget.theme.isDark ? 0.07 : 0.45),
+                          ),
+                    Colors.transparent,
+                  ],
+                ),
+          border: isMech3D
+              ? Border(
+                  top: BorderSide(color: Colors.white.withOpacity(widget.theme.isDark ? 0.14 : 0.65), width: 1.0),
+                  left: BorderSide(color: borderCol, width: 0.9),
+                  right: BorderSide(color: borderCol, width: 0.9),
+                  bottom: BorderSide(
+                    color: isEnter
+                        ? dynamicAccent.withOpacity(0.85)
+                        : Colors.black.withOpacity(widget.theme.isDark ? 0.55 : 0.25),
+                    width: _isPressed ? 1.5 : 3.8,
+                  ),
+                )
+              : Border.all(
+                  color: borderCol,
+                  width: borderWidth,
+                ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(widget.theme.isDark ? 0.3 : 0.08),
+              color: (animType == 'rgb_wave' || animType == 'cyber_scan' || isEnter)
+                  ? dynamicAccent.withOpacity(_isPressed ? 0.38 : (animType != 'none' ? 0.16 : 0.2))
+                  : Colors.black.withOpacity(widget.theme.isDark ? 0.32 : 0.09),
               offset: const Offset(0, 1.5),
-              blurRadius: 1.5,
+              blurRadius: animType != 'none' ? 5.0 : 1.8,
             ),
-            if (isEnter)
-              BoxShadow(
-                color: widget.theme.accentColor.withOpacity(0.2),
-                blurRadius: 5,
-                offset: const Offset(0, 1),
-              ),
           ],
         ),
         alignment: Alignment.center,

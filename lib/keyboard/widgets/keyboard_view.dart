@@ -16,28 +16,40 @@ import '../../features/customization/widgets/theme_quick_switcher.dart';
 
 class NoxKeyboardView extends StatefulWidget {
   final bool isImeMode;
+  final NoxKeyboardTheme? overrideTheme;
 
   const NoxKeyboardView({
     super.key,
     this.isImeMode = false,
+    this.overrideTheme,
   });
 
   @override
   State<NoxKeyboardView> createState() => _NoxFirebaseViewState();
 }
 
-class _NoxFirebaseViewState extends State<NoxKeyboardView> {
+class _NoxFirebaseViewState extends State<NoxKeyboardView>
+    with SingleTickerProviderStateMixin {
   final KeyboardEngine _engine = KeyboardEngine();
   final ThemeManager _themeManager = ThemeManager();
   final PreferencesHelper _prefs = PreferencesHelper();
   final ImePlatformBridge _bridge = ImePlatformBridge();
   double _lastSyncedContentHeight = -1;
+  late AnimationController _themeAnimController;
 
   double get _keyAreaHeight => (220.0 + (_prefs.keyboardHeight - 275.0)).clamp(185.0, 275.0);
+
+  NoxKeyboardTheme get _activeTheme => widget.overrideTheme ?? _themeManager.currentTheme;
 
   @override
   void initState() {
     super.initState();
+    _themeAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 3000),
+    );
+    _updateAnimationPlayback();
+
     _engine.addListener(_onEngineUpdate);
     _themeManager.addListener(_onThemeUpdate);
 
@@ -45,6 +57,24 @@ class _NoxFirebaseViewState extends State<NoxKeyboardView> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _syncNativeDimensions();
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant NoxKeyboardView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.overrideTheme?.id != widget.overrideTheme?.id) {
+      _updateAnimationPlayback();
+    }
+  }
+
+  void _updateAnimationPlayback() {
+    if (_activeTheme.isAnimated) {
+      if (!_themeAnimController.isAnimating) {
+        _themeAnimController.repeat();
+      }
+    } else {
+      _themeAnimController.stop();
+    }
   }
 
   void _syncNativeDimensions() {
@@ -61,6 +91,7 @@ class _NoxFirebaseViewState extends State<NoxKeyboardView> {
 
   @override
   void dispose() {
+    _themeAnimController.dispose();
     _engine.removeListener(_onEngineUpdate);
     _themeManager.removeListener(_onThemeUpdate);
     super.dispose();
@@ -72,70 +103,126 @@ class _NoxFirebaseViewState extends State<NoxKeyboardView> {
   }
 
   void _onThemeUpdate() {
+    _updateAnimationPlayback();
     if (mounted) setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = _themeManager.currentTheme;
+    final theme = _activeTheme;
     // Generous 60dp bottom navigation clearance so no keys touch the Android gesture bar or switcher
     final double navBarPadding = widget.isImeMode ? 60.0 : 0.0;
 
-    Widget mainContent;
-    switch (_engine.activePanel) {
-      case KeyboardPanel.toolsGrid:
-        mainContent = ToolsGridPanel(theme: theme, engine: _engine);
-        break;
-      case KeyboardPanel.emoji:
-        mainContent = EmojiPalette(theme: theme, engine: _engine);
-        break;
-      case KeyboardPanel.clipboard:
-        mainContent = ClipboardPanel(theme: theme, engine: _engine);
-        break;
-      case KeyboardPanel.textEditing:
-        mainContent = TextEditingPad(theme: theme, engine: _engine);
-        break;
-      case KeyboardPanel.voice:
-        mainContent = VoiceTypingPanel(theme: theme, engine: _engine);
-        break;
-      case KeyboardPanel.themes:
-        mainContent = ThemeQuickSwitcher(currentTheme: theme, engine: _engine);
-        break;
-      case KeyboardPanel.none:
-      default:
-        mainContent = _buildKeyGrid(theme);
-    }
+    return AnimatedBuilder(
+      animation: _themeAnimController,
+      builder: (context, _) {
+        final double animValue = theme.isAnimated ? _themeAnimController.value : 0.0;
 
-    final double keyAreaHeight = _keyAreaHeight;
-    final double totalHeight = 40.0 + keyAreaHeight + navBarPadding;
+        Widget mainContent;
+        switch (_engine.activePanel) {
+          case KeyboardPanel.toolsGrid:
+            mainContent = ToolsGridPanel(theme: theme, engine: _engine);
+            break;
+          case KeyboardPanel.emoji:
+            mainContent = EmojiPalette(theme: theme, engine: _engine);
+            break;
+          case KeyboardPanel.clipboard:
+            mainContent = ClipboardPanel(theme: theme, engine: _engine);
+            break;
+          case KeyboardPanel.textEditing:
+            mainContent = TextEditingPad(theme: theme, engine: _engine);
+            break;
+          case KeyboardPanel.voice:
+            mainContent = VoiceTypingPanel(theme: theme, engine: _engine);
+            break;
+          case KeyboardPanel.themes:
+            mainContent = ThemeQuickSwitcher(currentTheme: theme, engine: _engine);
+            break;
+          case KeyboardPanel.none:
+          default:
+            mainContent = _buildKeyGrid(theme, animValue);
+        }
 
-    Widget keyboardBody = Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // Single unified Gboard header bar (suggestions or toolbar + mic on right)
-        ToolbarWidget(engine: _engine, theme: theme),
-        SizedBox(
-          height: keyAreaHeight,
-          child: mainContent,
-        ),
-        // Dedicated 60dp navigation bar padding zone (lifts spacebar & keys completely above navigation bar)
-        if (navBarPadding > 0)
-          SizedBox(height: navBarPadding),
-      ],
+        final double keyAreaHeight = _keyAreaHeight;
+        final double totalHeight = 40.0 + keyAreaHeight + navBarPadding;
+
+        Widget keyboardBody = Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Single unified Gboard header bar (suggestions or toolbar + mic on right)
+            ToolbarWidget(engine: _engine, theme: theme),
+            SizedBox(
+              height: keyAreaHeight,
+              child: mainContent,
+            ),
+            // Dedicated 60dp navigation bar padding zone (lifts spacebar & keys completely above navigation bar)
+            if (navBarPadding > 0) SizedBox(height: navBarPadding),
+          ],
+        );
+
+        // Apply One-Handed mode wrapping if active
+        if (_engine.oneHandedMode != 'none') {
+          keyboardBody = _buildOneHandedWrapper(keyboardBody, theme, totalHeight, navBarPadding);
+        }
+
+        return Material(
+          color: theme.backgroundColor,
+          child: Container(
+            decoration: _buildKeyboardBackgroundDecoration(theme, animValue),
+            child: keyboardBody,
+          ),
+        );
+      },
     );
+  }
 
-    // Apply One-Handed mode wrapping if active
-    if (_engine.oneHandedMode != 'none') {
-      keyboardBody = _buildOneHandedWrapper(keyboardBody, theme, totalHeight, navBarPadding);
-    }
-
-    return Material(
-      color: theme.backgroundColor,
-      child: Container(
+  BoxDecoration _buildKeyboardBackgroundDecoration(NoxKeyboardTheme theme, double animValue) {
+    if (theme.animationType == 'aurora' && theme.gradientColors.length >= 2) {
+      final beginAlign = Alignment(-1.0 + animValue * 2.0, -1.0);
+      final endAlign = Alignment(1.0 - animValue * 2.0, 1.0);
+      return BoxDecoration(
         color: theme.backgroundColor,
-        child: keyboardBody,
-      ),
-    );
+        gradient: LinearGradient(
+          begin: beginAlign,
+          end: endAlign,
+          colors: [
+            theme.backgroundColor,
+            theme.gradientColors[0].withOpacity(0.14),
+            theme.gradientColors[1].withOpacity(0.12),
+            theme.backgroundColor,
+          ],
+        ),
+      );
+    }
+    if (theme.animationType == 'rgb_wave') {
+      final hue = (animValue * 360.0) % 360.0;
+      final c1 = HSVColor.fromAHSV(0.10, hue, 0.85, 1.0).toColor();
+      final c2 = HSVColor.fromAHSV(0.08, (hue + 120) % 360, 0.85, 1.0).toColor();
+      return BoxDecoration(
+        color: theme.backgroundColor,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [c1, theme.backgroundColor, c2],
+        ),
+      );
+    }
+    if (theme.animationType == 'cyber_scan' && theme.gradientColors.length >= 2) {
+      return BoxDecoration(
+        color: theme.backgroundColor,
+        gradient: LinearGradient(
+          begin: Alignment(-1.2 + animValue * 2.4, -0.5),
+          end: Alignment(-0.2 + animValue * 2.4, 0.5),
+          colors: [
+            theme.backgroundColor,
+            theme.gradientColors[0].withOpacity(0.12),
+            theme.gradientColors[1].withOpacity(0.10),
+            theme.backgroundColor,
+          ],
+        ),
+      );
+    }
+    return BoxDecoration(color: theme.backgroundColor);
   }
 
   Widget _buildOneHandedWrapper(
@@ -211,7 +298,7 @@ class _NoxFirebaseViewState extends State<NoxKeyboardView> {
     );
   }
 
-  Widget _buildKeyGrid(NoxKeyboardTheme theme) {
+  Widget _buildKeyGrid(NoxKeyboardTheme theme, double animValue) {
     final page = _engine.activePage;
     final numberRow = _engine.numberRow;
 
@@ -224,19 +311,36 @@ class _NoxFirebaseViewState extends State<NoxKeyboardView> {
           if (numberRow != null)
             Expanded(
               child: Row(
-                children: numberRow.keys
-                    .map((k) => KeyboardKeyWidget(keyboardKey: k, theme: theme, engine: _engine))
-                    .toList(),
+                children: List.generate(
+                  numberRow.keys.length,
+                  (col) => KeyboardKeyWidget(
+                    keyboardKey: numberRow.keys[col],
+                    theme: theme,
+                    engine: _engine,
+                    animValue: animValue,
+                    colIndex: col,
+                    rowIndex: 0,
+                  ),
+                ),
               ),
             ),
 
           // Standard layout rows
-          ...page.rows.map((row) {
+          ...List.generate(page.rows.length, (rowIdx) {
+            final row = page.rows[rowIdx];
             return Expanded(
               child: Row(
-                children: row.keys
-                    .map((k) => KeyboardKeyWidget(keyboardKey: k, theme: theme, engine: _engine))
-                    .toList(),
+                children: List.generate(
+                  row.keys.length,
+                  (col) => KeyboardKeyWidget(
+                    keyboardKey: row.keys[col],
+                    theme: theme,
+                    engine: _engine,
+                    animValue: animValue,
+                    colIndex: col,
+                    rowIndex: rowIdx + (numberRow != null ? 1 : 0),
+                  ),
+                ),
               ),
             );
           }),

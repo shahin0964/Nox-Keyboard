@@ -21,6 +21,12 @@ class NoxKeyboardTheme {
   final double keyMarginV;
   final double fontSize;
 
+  // Dynamic visual styles (keyboard-only)
+  final String category; // 'Animated RGB', 'Dynamic Glass', '3D & Mechanical', 'Minimal'
+  final String keyShape; // 'rounded', 'pill', 'mechanical_3d', 'cyber_sharp', 'glass_frost', 'neon_outline', 'soft_blob'
+  final String animationType; // 'none', 'rgb_wave', 'aurora', 'pulse_glow', 'shimmer', 'cyber_scan'
+  final List<Color> gradientColors;
+
   const NoxKeyboardTheme({
     required this.id,
     required this.name,
@@ -41,7 +47,13 @@ class NoxKeyboardTheme {
     this.keyMarginH = 3.0,
     this.keyMarginV = 5.0,
     this.fontSize = 20.0,
+    this.category = 'Minimal',
+    this.keyShape = 'rounded',
+    this.animationType = 'none',
+    this.gradientColors = const [],
   });
+
+  bool get isAnimated => animationType != 'none';
 
   NoxKeyboardTheme copyWith({
     String? id,
@@ -63,6 +75,10 @@ class NoxKeyboardTheme {
     double? keyMarginH,
     double? keyMarginV,
     double? fontSize,
+    String? category,
+    String? keyShape,
+    String? animationType,
+    List<Color>? gradientColors,
   }) {
     return NoxKeyboardTheme(
       id: id ?? this.id,
@@ -84,6 +100,10 @@ class NoxKeyboardTheme {
       keyMarginH: keyMarginH ?? this.keyMarginH,
       keyMarginV: keyMarginV ?? this.keyMarginV,
       fontSize: fontSize ?? this.fontSize,
+      category: category ?? this.category,
+      keyShape: keyShape ?? this.keyShape,
+      animationType: animationType ?? this.animationType,
+      gradientColors: gradientColors ?? this.gradientColors,
     );
   }
 
@@ -108,10 +128,18 @@ class NoxKeyboardTheme {
       'keyMarginH': keyMarginH,
       'keyMarginV': keyMarginV,
       'fontSize': fontSize,
+      'category': category,
+      'keyShape': keyShape,
+      'animationType': animationType,
+      'gradientColors': gradientColors.map((c) => c.value).toList(),
     };
   }
 
   factory NoxKeyboardTheme.fromJson(Map<String, dynamic> json) {
+    final gradList = (json['gradientColors'] as List?)
+            ?.map((e) => Color(e as int))
+            .toList() ??
+        const [];
     return NoxKeyboardTheme(
       id: json['id'] as String,
       name: json['name'] as String,
@@ -132,6 +160,10 @@ class NoxKeyboardTheme {
       keyMarginH: (json['keyMarginH'] as num?)?.toDouble() ?? 3.0,
       keyMarginV: (json['keyMarginV'] as num?)?.toDouble() ?? 5.0,
       fontSize: (json['fontSize'] as num?)?.toDouble() ?? 20.0,
+      category: json['category'] as String? ?? 'Minimal',
+      keyShape: json['keyShape'] as String? ?? 'rounded',
+      animationType: json['animationType'] as String? ?? 'none',
+      gradientColors: gradList,
     );
   }
 }

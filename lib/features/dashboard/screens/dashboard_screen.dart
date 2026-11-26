@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../app/widgets/modern_ui.dart';
 import '../../../data/preferences_helper.dart';
 import '../../../services/ime_platform_bridge.dart';
 import '../../../languages/language_manager.dart';
@@ -17,6 +18,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final ImePlatformBridge _bridge = ImePlatformBridge();
   final LanguageManager _langManager = LanguageManager();
   final ThemeManager _themeManager = ThemeManager();
+  final PreferencesHelper _prefs = PreferencesHelper();
 
   bool _isEnabled = false;
   bool _isDefault = false;
@@ -57,261 +59,306 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     final theme = _themeManager.currentTheme;
     final currentLang = _langManager.currentLanguage;
+    final isReady = _isEnabled && _isDefault;
+    final dictCount = _prefs.userDictionary.length + _prefs.learnedWordFreq.length;
+    final shortcutsCount = _prefs.customShortcuts.length;
 
     return Scaffold(
+      backgroundColor: const Color(0xFF090D16),
       appBar: AppBar(
+        backgroundColor: const Color(0xFF090D16),
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
         title: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(6),
+              padding: const EdgeInsets.all(7),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(10),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF00E5FF), Color(0xFF3B82F6)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(11),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF00E5FF).withOpacity(0.28),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-              child: Icon(CupertinoIcons.keyboard, size: 22, color: Theme.of(context).colorScheme.primary),
+              child: const Icon(CupertinoIcons.keyboard, size: 19, color: Colors.black),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 11),
             const Text(
               AppConstants.appName,
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 20,
+                letterSpacing: -0.3,
+                color: Color(0xFFF8FAFC),
+              ),
             ),
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(CupertinoIcons.info_circle),
-            onPressed: () => Navigator.of(context).pushNamed('/about'),
+          Container(
+            margin: const EdgeInsets.only(right: 10),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.06),
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white.withOpacity(0.08)),
+            ),
+            child: IconButton(
+              icon: const Icon(CupertinoIcons.info, size: 19, color: Colors.white70),
+              onPressed: () => Navigator.of(context).pushNamed('/about'),
+            ),
           ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: _checkStatus,
-        child: ListView(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-          children: [
-            // Status Card
-            _buildStatusCard(),
-
-            const SizedBox(height: 16),
-
-            // Live Testing Input Card
-            _buildTestingCard(),
-
-            const SizedBox(height: 20),
-
-            // Section Header
-            const Text(
-              'Features & Customization',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+      body: Stack(
+        children: [
+          // Subtle ambient glow
+          Positioned(
+            top: -110,
+            right: -60,
+            child: Container(
+              width: 260,
+              height: 260,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    const Color(0xFF00E5FF).withOpacity(0.11),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
             ),
-
-            const SizedBox(height: 12),
-
-            // Navigation Grid
-            GridView.count(
-              crossAxisCount: 2,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              childAspectRatio: 1.35,
+          ),
+          RefreshIndicator(
+            onRefresh: () async {
+              await _prefs.reload();
+              await _checkStatus();
+              _onStateChange();
+            },
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
               children: [
-                _buildActionCard(
-                  title: 'Languages',
-                  subtitle: '${currentLang.nativeName} (${currentLang.flag})',
-                  icon: CupertinoIcons.globe,
-                  color: const Color(0xFF3B82F6),
-                  route: '/languages',
+                // Auto-hidden once Nox Keyboard is enabled & set as default
+                if (!isReady) ...[
+                  _buildSetupBannerCard(),
+                  const SizedBox(height: 14),
+                ],
+
+                // Compact sleek quick-test pill
+                _buildCompactTestBar(),
+
+                const SizedBox(height: 18),
+
+                const ModernSectionHeader(title: 'Features & Customization'),
+
+                // Modern Glassmorphic Grid
+                GridView.count(
+                  crossAxisCount: 2,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: 1.28,
+                  children: [
+                    _buildActionCard(
+                      title: 'Languages',
+                      subtitle: '${currentLang.nativeName} ${currentLang.flag}',
+                      icon: CupertinoIcons.globe,
+                      color: const Color(0xFF38BDF8),
+                      route: '/languages',
+                    ),
+                    _buildActionCard(
+                      title: 'Themes & RGB',
+                      subtitle: '${theme.name} • ${theme.category}',
+                      icon: Icons.palette_rounded,
+                      color: const Color(0xFFA855F7),
+                      route: '/themes',
+                    ),
+                    _buildActionCard(
+                      title: 'Typing & Smart',
+                      subtitle: 'Size, Sound, Accuracy',
+                      icon: CupertinoIcons.slider_horizontal_3,
+                      color: const Color(0xFF10B981),
+                      route: '/typing-settings',
+                    ),
+                    _buildActionCard(
+                      title: 'Shortcuts',
+                      subtitle: '$shortcutsCount quick keys',
+                      icon: CupertinoIcons.bolt_fill,
+                      color: const Color(0xFF38BDF8),
+                      route: '/shortcuts',
+                    ),
+                    _buildActionCard(
+                      title: 'Custom Dictionary',
+                      subtitle: '$dictCount learned & custom',
+                      icon: CupertinoIcons.book_fill,
+                      color: const Color(0xFFF59E0B),
+                      route: '/dictionary-settings',
+                    ),
+                    _buildActionCard(
+                      title: 'Clipboard',
+                      subtitle: '${_prefs.pinnedClipboard.length} pinned • images',
+                      icon: CupertinoIcons.doc_on_clipboard_fill,
+                      color: const Color(0xFF06B6D4),
+                      route: '/clipboard',
+                    ),
+                    _buildActionCard(
+                      title: 'Privacy & Data',
+                      subtitle: '100% Offline & Local',
+                      icon: CupertinoIcons.shield_lefthalf_fill,
+                      color: const Color(0xFFEC4899),
+                      route: '/privacy',
+                    ),
+                    _buildActionCard(
+                      title: 'App Info',
+                      subtitle: 'Nox Engine & Version',
+                      icon: CupertinoIcons.info_circle_fill,
+                      color: const Color(0xFF94A3B8),
+                      route: '/about',
+                    ),
+                  ],
                 ),
-                _buildActionCard(
-                  title: 'Themes',
-                  subtitle: theme.name,
-                  icon: Icons.palette,
-                  color: const Color(0xFF8B5CF6),
-                  route: '/themes',
+
+                const SizedBox(height: 18),
+
+                // Interactive Playground Card
+                GlassCard(
+                  onTap: () => Navigator.of(context).pushNamed('/preview'),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  borderColor: const Color(0xFF00E5FF).withOpacity(0.24),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF00E5FF), Color(0xFF3B82F6)],
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Icon(CupertinoIcons.play_fill, color: Colors.black, size: 20),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Interactive Keyboard Playground',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14.5,
+                                color: Color(0xFFF8FAFC),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Test Bangla Avro, RGB themes, gestures & voice',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.white.withOpacity(0.58),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(CupertinoIcons.chevron_forward, size: 17, color: Colors.white.withOpacity(0.5)),
+                    ],
+                  ),
                 ),
-                _buildActionCard(
-                  title: 'Typing & Smart',
-                  subtitle: 'Autocorrect & Suggest',
-                  icon: CupertinoIcons.slider_horizontal_3,
-                  color: const Color(0xFF10B981),
-                  route: '/typing-settings',
-                ),
-                _buildActionCard(
-                  title: 'Custom Dictionary',
-                  subtitle: '${PreferencesHelper().userDictionary.length} words',
-                  icon: CupertinoIcons.book_fill,
-                  color: const Color(0xFFF59E0B),
-                  route: '/dictionary-settings',
-                ),
-                _buildActionCard(
-                  title: 'Clipboard',
-                  subtitle: '${PreferencesHelper().pinnedClipboard.length} pinned',
-                  icon: CupertinoIcons.doc_on_clipboard_fill,
-                  color: const Color(0xFF06B6D4),
-                  route: '/clipboard',
-                ),
-                _buildActionCard(
-                  title: 'Privacy & Data',
-                  subtitle: '100% Offline & Local',
-                  icon: CupertinoIcons.shield_lefthalf_fill,
-                  color: const Color(0xFFEC4899),
-                  route: '/privacy',
-                ),
+
+                const SizedBox(height: 24),
               ],
             ),
-
-            const SizedBox(height: 20),
-
-            // Full Screen Playground Link
-            Card(
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-                side: BorderSide(color: Colors.grey.withOpacity(0.2)),
-              ),
-              child: ListTile(
-                leading: const CircleAvatar(
-                  backgroundColor: Color(0xFF00E5FF),
-                  child: Icon(CupertinoIcons.play_circle_fill, color: Colors.black87),
-                ),
-                title: const Text('Interactive Keyboard Playground', style: TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: const Text('Try layouts, Bangla phonetic, emojis & gestures'),
-                trailing: const Icon(CupertinoIcons.chevron_forward, size: 18),
-                onTap: () => Navigator.of(context).pushNamed('/preview'),
-              ),
-            ),
-
-            const SizedBox(height: 24),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildStatusCard() {
-    final isReady = _isEnabled && _isDefault;
-
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: isReady
-              ? [const Color(0xFF065F46), const Color(0xFF047857)]
-              : [const Color(0xFF1E293B), const Color(0xFF334155)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: (isReady ? const Color(0xFF047857) : Colors.black).withOpacity(0.25),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(18),
+  Widget _buildSetupBannerCard() {
+    return GlassCard(
+      padding: const EdgeInsets.all(16),
+      fillColor: const Color(0xFFF59E0B).withOpacity(0.09),
+      borderColor: const Color(0xFFF59E0B).withOpacity(0.35),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Icon(
-                    isReady ? CupertinoIcons.checkmark_seal_fill : CupertinoIcons.exclamationmark_triangle_fill,
-                    color: isReady ? const Color(0xFF6EE7B7) : const Color(0xFFFBBF24),
-                    size: 24,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    isReady ? 'Active Default Keyboard' : 'Setup Required',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 17,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
+              const Icon(CupertinoIcons.exclamationmark_triangle_fill, color: Color(0xFFFBBF24), size: 20),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Finish Setting Up Nox Keyboard',
+                  style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                ),
               ),
-              IconButton(
-                icon: const Icon(CupertinoIcons.arrow_clockwise, color: Colors.white70, size: 20),
-                onPressed: _checkStatus,
+              InkWell(
+                onTap: _checkStatus,
+                child: const Icon(CupertinoIcons.arrow_clockwise, color: Colors.white70, size: 18),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
-            isReady
-                ? 'Nox Keyboard is enabled and set as your system input method. Ready to use in all apps!'
-                : (!_isEnabled
-                    ? 'Nox Keyboard is not enabled in Android Settings yet.'
-                    : 'Nox Keyboard is enabled, but not selected as your default keyboard.'),
-            style: const TextStyle(color: Colors.white70, fontSize: 13),
+            !_isEnabled
+                ? 'Enable Nox Keyboard in Android Settings to use it everywhere.'
+                : 'Select Nox Keyboard as your active default keyboard.',
+            style: TextStyle(color: Colors.white.withOpacity(0.72), fontSize: 12.5),
           ),
-          if (!isReady) ...[
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                if (!_isEnabled)
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: Colors.black,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      icon: const Icon(CupertinoIcons.gear, size: 16),
-                      label: const Text('Enable in Settings'),
-                      onPressed: () async {
-                        await _bridge.openInputMethodSettings();
-                        Future.delayed(const Duration(seconds: 1), _checkStatus);
-                      },
-                    ),
-                  ),
-                if (_isEnabled && !_isDefault)
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF6EE7B7),
-                        foregroundColor: Colors.black,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      icon: const Icon(CupertinoIcons.checkmark, size: 16),
-                      label: const Text('Select as Default'),
-                      onPressed: () async {
-                        await _bridge.showInputMethodPicker();
-                        Future.delayed(const Duration(seconds: 1), _checkStatus);
-                      },
-                    ),
-                  ),
-              ],
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFFBBF24),
+                foregroundColor: Colors.black,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              icon: Icon(!_isEnabled ? CupertinoIcons.gear : CupertinoIcons.checkmark, size: 16),
+              label: Text(!_isEnabled ? 'Enable in Settings' : 'Set as Default Keyboard'),
+              onPressed: () async {
+                if (!_isEnabled) {
+                  await _bridge.openInputMethodSettings();
+                } else {
+                  await _bridge.showInputMethodPicker();
+                }
+                Future.delayed(const Duration(seconds: 1), _checkStatus);
+              },
             ),
-          ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildTestingCard() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.grey.withOpacity(0.2)),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+  Widget _buildCompactTestBar() {
+    return GlassCard(
+      borderRadius: 16,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
       child: TextField(
         controller: _quickTestController,
+        style: const TextStyle(fontSize: 14, color: Colors.white),
         decoration: InputDecoration(
-          hintText: 'Tap here to test typing with Nox...',
-          hintStyle: TextStyle(color: Colors.grey.withOpacity(0.8), fontSize: 14),
+          hintText: 'Quick test typing here...',
+          hintStyle: TextStyle(color: Colors.white.withOpacity(0.42), fontSize: 13.5),
           border: InputBorder.none,
-          prefixIcon: const Icon(CupertinoIcons.pencil_circle, size: 22),
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(vertical: 11),
+          prefixIcon: Icon(CupertinoIcons.sparkles, size: 18, color: const Color(0xFF00E5FF).withOpacity(0.85)),
           suffixIcon: IconButton(
-            icon: const Icon(CupertinoIcons.clear_circled, size: 18),
+            icon: Icon(CupertinoIcons.clear_circled_solid, size: 17, color: Colors.white.withOpacity(0.4)),
             onPressed: () => _quickTestController.clear(),
           ),
         ),
@@ -326,54 +373,55 @@ class _DashboardScreenState extends State<DashboardScreen> {
     required Color color,
     required String route,
   }) {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: Colors.grey.withOpacity(0.15)),
-      ),
-        child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: () {
-          Navigator.of(context).pushNamed(route).then((_) async {
-            await PreferencesHelper().reload();
-            _checkStatus();
-            _onStateChange();
-          });
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return GlassCard(
+      borderRadius: 20,
+      onTap: () {
+        Navigator.of(context).pushNamed(route).then((_) async {
+          await _prefs.reload();
+          await _themeManager.init();
+          await _langManager.init();
+          _checkStatus();
+          _onStateChange();
+        });
+      },
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(10),
+              ModernIconBadge(icon: icon, color: color, size: 20),
+              Icon(CupertinoIcons.chevron_forward, size: 15, color: Colors.white.withOpacity(0.32)),
+            ],
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14.5,
+                  color: Color(0xFFF8FAFC),
                 ),
-                child: Icon(icon, color: color, size: 22),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  color: Colors.white.withOpacity(0.54),
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
-        ),
+        ],
       ),
     );
   }

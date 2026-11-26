@@ -56,6 +56,8 @@ class KeyboardEngine extends ChangeNotifier {
   String _contextBefore = '';
   String get contextBefore => _contextBefore;
 
+  String _lastCommittedWord = '';
+
   List<SuggestionCandidate> _candidates = [];
   List<SuggestionCandidate> get candidates => _candidates;
 
@@ -113,6 +115,10 @@ class KeyboardEngine extends ChangeNotifier {
       if (clip.trim().isNotEmpty) {
         await _prefs.addClipboardItem(clip.trim());
       }
+      final imgPath = data['clipboardImagePath'] as String? ?? '';
+      if (imgPath.trim().isNotEmpty) {
+        await _prefs.addImageClip(imgPath.trim());
+      }
 
       _isPassword = data['isPassword'] as bool? ?? false;
       _actionId = data['actionId'] as int? ?? 0;
@@ -151,6 +157,11 @@ class KeyboardEngine extends ChangeNotifier {
     }
   }
 
+  bool get _isAvroActive {
+    final code = _langManager.currentLanguage.code;
+    return code == 'bn_avro' || (code == 'bn_BD' && _langManager.isBanglaPhonetic);
+  }
+
   KeyboardPage get activePage {
     switch (_mode) {
       case KeyboardMode.symbols:
@@ -160,6 +171,12 @@ class KeyboardEngine extends ChangeNotifier {
       case KeyboardMode.letters:
         final lang = _langManager.currentLanguage;
         switch (lang.code) {
+          case 'bn_avro':
+            return BanglaLayout.getPage(
+              isPhonetic: true,
+              isShifted: _isShifted,
+              isCapsLock: _isCapsLock,
+            );
           case 'bn_BD':
             return BanglaLayout.getPage(
               isPhonetic: _langManager.isBanglaPhonetic,
@@ -259,31 +276,38 @@ class KeyboardEngine extends ChangeNotifier {
     }
   }
 
+  void _learnCommittedWord(String word) {
+    if (_isPassword) return;
+    final clean = word.trim();
+    if (clean.length < 2) return;
+    _prefs.recordLearnedWord(clean);
+    if (_lastCommittedWord.isNotEmpty) {
+      _prefs.recordLearnedBigram(_lastCommittedWord, clean);
+    }
+    _lastCommittedWord = clean;
+  }
+
   void _handleCharacter(String char) {
-    final lang = _langManager.currentLanguage;
     _forceShowToolbar = false;
 
-    if (lang.code == 'bn_BD' && _langManager.isBanglaPhonetic && _mode == KeyboardMode.letters) {
-      // In Bangla Phonetic: accumulate roman characters and compute phonetic output
+    if (_isAvroActive && _mode == KeyboardMode.letters) {
+      // In Bangla Avro Phonetic: accumulate roman characters and compute phonetic output
       _composingWord += char;
       _updateSuggestions();
     } else {
-      // Direct commit or standard typing
+      // Commit text first for instant zero-lag appearance in active field
+      _bridge.commitText(char);
+      _contextBefore += char;
       final isLetter = RegExp(r'[a-zA-Z]').hasMatch(char);
       if (isLetter && _mode == KeyboardMode.letters) {
         _composingWord += char;
-        _bridge.commitText(char);
-        _contextBefore += char;
-        _updateSuggestions();
       } else {
-        // Punctuation, symbol or direct script (Bangla script, Hindi, etc.)
         if (_composingWord.isNotEmpty) {
+          _learnCommittedWord(_composingWord);
           _composingWord = '';
         }
-        _bridge.commitText(char);
-        _contextBefore += char;
-        _updateSuggestions();
       }
+      _updateSuggestions();
     }
 
     // Auto unshift after single shift tap
@@ -328,8 +352,7 @@ class KeyboardEngine extends ChangeNotifier {
 
     if (_composingWord.isNotEmpty) {
       _composingWord = _composingWord.substring(0, _composingWord.length - 1);
-      final lang = _langManager.currentLanguage;
-      if (!(lang.code == 'bn_BD' && _langManager.isBanglaPhonetic)) {
+      if (!_isAvroActive) {
         _bridge.deleteBackward();
       }
       _updateSuggestions();
@@ -351,14 +374,13 @@ class KeyboardEngine extends ChangeNotifier {
   }
 
   void _handleSpace() {
-    final lang = _langManager.currentLanguage;
-
-    // 1. If in Bangla Phonetic mode, commit the top phonetic candidate or parsed word
-    if (lang.code == 'bn_BD' && _langManager.isBanglaPhonetic && _composingWord.isNotEmpty) {
+    // 1. If in Bangla Avro Phonetic mode, commit the top phonetic candidate or parsed word
+    if (_isAvroActive && _composingWord.isNotEmpty) {
       final candidate = _candidates.isNotEmpty
           ? _candidates.first.text
           : _banglaPhonetic.parse(_composingWord);
       _bridge.commitText('$candidate ');
+      _learnCommittedWord(candidate);
       _contextBefore += '$candidate ';
       _composingWord = '';
       _updateSuggestions();
@@ -375,6 +397,7 @@ class KeyboardEngine extends ChangeNotifier {
           _bridge.deleteBackward();
         }
         _bridge.commitText('${center.text} ');
+        _learnCommittedWord(center.text);
         _autocorrectService.recordAutocorrect(_composingWord, center.text);
         _contextBefore += '${center.text} ';
         _composingWord = '';
@@ -382,6 +405,11 @@ class KeyboardEngine extends ChangeNotifier {
         notifyListeners();
         return;
       }
+    }
+
+    // Learn user's exact typed word before clearing composing buffer
+    if (_composingWord.isNotEmpty) {
+      _learnCommittedWord(_composingWord);
     }
 
     // 3. Double-space period shortcut
@@ -409,6 +437,9 @@ class KeyboardEngine extends ChangeNotifier {
   }
 
   void _handleEnter() {
+    if (_composingWord.isNotEmpty) {
+      _learnCommittedWord(_composingWord);
+    }
     _composingWord = '';
     _candidates.clear();
     _bridge.performEditorAction(_actionId);
@@ -417,9 +448,8 @@ class KeyboardEngine extends ChangeNotifier {
 
   void selectSuggestion(SuggestionCandidate candidate) {
     _hapticSound.onKeyFeedback();
-    final lang = _langManager.currentLanguage;
 
-    if (lang.code == 'bn_BD' && _langManager.isBanglaPhonetic) {
+    if (_isAvroActive) {
       _bridge.commitText('${candidate.text} ');
       _contextBefore += '${candidate.text} ';
     } else {
@@ -432,6 +462,7 @@ class KeyboardEngine extends ChangeNotifier {
       _contextBefore += '${candidate.text} ';
     }
 
+    _learnCommittedWord(candidate.text);
     _composingWord = '';
     _autocorrectService.clearLastAutocorrect();
     _updateSuggestions();
