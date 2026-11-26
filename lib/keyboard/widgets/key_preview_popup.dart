@@ -11,8 +11,8 @@ class KeyPreviewPopup extends StatefulWidget {
     super.key,
     required this.label,
     required this.theme,
-    this.keyWidth = 44,
-    this.keyHeight = 52,
+    this.keyWidth = 36,
+    this.keyHeight = 46,
   });
 
   @override
@@ -29,10 +29,10 @@ class _KeyPreviewPopupState extends State<KeyPreviewPopup>
     super.initState();
     _animController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 55),
+      duration: const Duration(milliseconds: 50),
     );
 
-    _scaleAnimation = Tween<double>(begin: 0.82, end: 1.0).animate(
+    _scaleAnimation = Tween<double>(begin: 0.85, end: 1.0).animate(
       CurvedAnimation(parent: _animController, curve: Curves.easeOutBack),
     );
 
@@ -48,8 +48,9 @@ class _KeyPreviewPopupState extends State<KeyPreviewPopup>
   @override
   Widget build(BuildContext context) {
     final theme = widget.theme;
-    final double popupWidth = widget.keyWidth + 14;
-    final double popupHeight = widget.keyHeight + 38;
+    // Compact Gboard-style floating key bubble
+    final double popupWidth = widget.keyWidth + 4;
+    const double popupHeight = 40.0;
     final Color popupBg = theme.isDark
         ? (Color.lerp(theme.keyPressedColor, Colors.white, 0.14) ?? theme.keyPressedColor)
         : theme.keyPressedColor;
@@ -64,42 +65,33 @@ class _KeyPreviewPopupState extends State<KeyPreviewPopup>
           height: popupHeight,
           decoration: BoxDecoration(
             color: popupBg,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(11),
             border: Border.all(
-              color: theme.accentColor.withOpacity(0.7),
-              width: 1.3,
+              color: theme.accentColor.withOpacity(0.65),
+              width: 1.1,
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(theme.isDark ? 0.55 : 0.22),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
+                color: Colors.black.withOpacity(theme.isDark ? 0.5 : 0.2),
+                blurRadius: 7,
+                offset: const Offset(0, 3),
               ),
               BoxShadow(
-                color: theme.accentColor.withOpacity(0.22),
-                blurRadius: 6,
+                color: theme.accentColor.withOpacity(0.18),
+                blurRadius: 4,
                 offset: const Offset(0, 1),
               ),
             ],
           ),
-          child: Column(
-            children: [
-              // Top floating magnified character (Gboard Magnifier)
-              Container(
-                height: 44,
-                alignment: Alignment.center,
-                child: Text(
-                  widget.label,
-                  style: TextStyle(
-                    color: theme.textColor,
-                    fontSize: 29,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-              ),
-              const Spacer(),
-            ],
+          alignment: Alignment.center,
+          child: Text(
+            widget.label,
+            style: TextStyle(
+              color: theme.textColor,
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              letterSpacing: -0.3,
+            ),
           ),
         ),
       ),

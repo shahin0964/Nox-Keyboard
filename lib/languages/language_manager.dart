@@ -28,6 +28,11 @@ class LanguageManager extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> reload() async {
+    await PreferencesHelper().reload();
+    await init();
+  }
+
   Future<void> setLanguage(String code) async {
     _currentLanguage = LanguageModel.findByCode(code);
     await PreferencesHelper().setSelectedLanguage(code);

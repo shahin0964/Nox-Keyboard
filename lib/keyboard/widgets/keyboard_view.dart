@@ -31,6 +31,9 @@ class _NoxFirebaseViewState extends State<NoxKeyboardView> {
   final ThemeManager _themeManager = ThemeManager();
   final PreferencesHelper _prefs = PreferencesHelper();
   final ImePlatformBridge _bridge = ImePlatformBridge();
+  double _lastSyncedContentHeight = -1;
+
+  double get _keyAreaHeight => (220.0 + (_prefs.keyboardHeight - 275.0)).clamp(185.0, 275.0);
 
   @override
   void initState() {
@@ -38,13 +41,22 @@ class _NoxFirebaseViewState extends State<NoxKeyboardView> {
     _engine.addListener(_onEngineUpdate);
     _themeManager.addListener(_onThemeUpdate);
 
-    // Sync taller key area (260dp content) + generous 60dp navigation bar clearance with native Android
+    // Sync key area + 40dp toolbar + generous 60dp navigation bar clearance with native Android
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _syncNativeDimensions();
+    });
+  }
+
+  void _syncNativeDimensions() {
+    if (!widget.isImeMode) return;
+    final contentHeight = _keyAreaHeight + 40.0;
+    if ((_lastSyncedContentHeight - contentHeight).abs() > 0.5) {
+      _lastSyncedContentHeight = contentHeight;
       _bridge.updateKeyboardDimensions(
-        contentHeight: 260.0,
+        contentHeight: contentHeight,
         navBarHeight: 60.0,
       );
-    });
+    }
   }
 
   @override
@@ -55,6 +67,7 @@ class _NoxFirebaseViewState extends State<NoxKeyboardView> {
   }
 
   void _onEngineUpdate() {
+    _syncNativeDimensions();
     if (mounted) setState(() {});
   }
 
@@ -93,13 +106,16 @@ class _NoxFirebaseViewState extends State<NoxKeyboardView> {
         mainContent = _buildKeyGrid(theme);
     }
 
+    final double keyAreaHeight = _keyAreaHeight;
+    final double totalHeight = 40.0 + keyAreaHeight + navBarPadding;
+
     Widget keyboardBody = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         // Single unified Gboard header bar (suggestions or toolbar + mic on right)
         ToolbarWidget(engine: _engine, theme: theme),
         SizedBox(
-          height: 220.0, // Taller, comfortable, and spacious key area (as requested)
+          height: keyAreaHeight,
           child: mainContent,
         ),
         // Dedicated 60dp navigation bar padding zone (lifts spacebar & keys completely above navigation bar)
@@ -110,7 +126,7 @@ class _NoxFirebaseViewState extends State<NoxKeyboardView> {
 
     // Apply One-Handed mode wrapping if active
     if (_engine.oneHandedMode != 'none') {
-      keyboardBody = _buildOneHandedWrapper(keyboardBody, theme);
+      keyboardBody = _buildOneHandedWrapper(keyboardBody, theme, totalHeight, navBarPadding);
     }
 
     return Material(
@@ -122,12 +138,19 @@ class _NoxFirebaseViewState extends State<NoxKeyboardView> {
     );
   }
 
-  Widget _buildOneHandedWrapper(Widget child, NoxKeyboardTheme theme) {
+  Widget _buildOneHandedWrapper(
+    Widget child,
+    NoxKeyboardTheme theme,
+    double totalHeight,
+    double navBarPadding,
+  ) {
     final isLeft = _engine.oneHandedMode == 'left';
 
     final sidebar = Container(
-      width: 50,
-      color: theme.toolbarColor.withOpacity(theme.isDark ? 0.8 : 0.95),
+      width: 48,
+      height: totalHeight,
+      padding: EdgeInsets.only(bottom: navBarPadding),
+      color: theme.toolbarColor.withOpacity(theme.isDark ? 0.85 : 0.95),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
@@ -138,16 +161,16 @@ class _NoxFirebaseViewState extends State<NoxKeyboardView> {
             child: Container(
               padding: const EdgeInsets.all(7),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(theme.isDark ? 0.06 : 0.2),
+                color: Colors.white.withOpacity(theme.isDark ? 0.08 : 0.25),
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: Colors.white.withOpacity(theme.isDark ? 0.08 : 0.16),
+                  color: Colors.white.withOpacity(theme.isDark ? 0.1 : 0.18),
                 ),
               ),
               child: Icon(
                 CupertinoIcons.arrow_up_left_arrow_down_right,
                 size: 17,
-                color: theme.secondaryTextColor,
+                color: theme.textColor,
               ),
             ),
           ),
@@ -158,16 +181,16 @@ class _NoxFirebaseViewState extends State<NoxKeyboardView> {
             child: Container(
               padding: const EdgeInsets.all(7),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(theme.isDark ? 0.06 : 0.2),
+                color: Colors.white.withOpacity(theme.isDark ? 0.08 : 0.25),
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: Colors.white.withOpacity(theme.isDark ? 0.08 : 0.16),
+                  color: Colors.white.withOpacity(theme.isDark ? 0.1 : 0.18),
                 ),
               ),
               child: Icon(
                 isLeft ? CupertinoIcons.arrow_right_circle : CupertinoIcons.arrow_left_circle,
                 size: 19,
-                color: theme.secondaryTextColor,
+                color: theme.accentColor,
               ),
             ),
           ),
@@ -175,12 +198,16 @@ class _NoxFirebaseViewState extends State<NoxKeyboardView> {
       ),
     );
 
-    return Row(
-      children: [
-        if (!isLeft) sidebar,
-        Expanded(child: child),
-        if (isLeft) sidebar,
-      ],
+    return SizedBox(
+      height: totalHeight,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (!isLeft) sidebar,
+          Expanded(child: child),
+          if (isLeft) sidebar,
+        ],
+      ),
     );
   }
 

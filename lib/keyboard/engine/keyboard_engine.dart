@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_constants.dart';
 import '../../data/preferences_helper.dart';
 import '../../languages/language_manager.dart';
+import '../../themes/theme_manager.dart';
 import '../../services/ime_platform_bridge.dart';
 import '../layouts/keyboard_layout.dart';
 import '../layouts/english_layout.dart';
@@ -100,7 +101,19 @@ class KeyboardEngine extends ChangeNotifier {
       notifyListeners();
     });
 
-    _bridge.onStartInputCallback = (data) {
+    _bridge.onStartInputCallback = (data) async {
+      await _prefs.reload();
+      await ThemeManager().init();
+      await _langManager.init();
+      _showNumberRow = _prefs.showNumberRow;
+      _oneHandedMode = _prefs.oneHandedMode;
+      _isFloating = _prefs.isFloatingMode;
+
+      final clip = data['clipboardText'] as String? ?? '';
+      if (clip.trim().isNotEmpty) {
+        await _prefs.addClipboardItem(clip.trim());
+      }
+
       _isPassword = data['isPassword'] as bool? ?? false;
       _actionId = data['actionId'] as int? ?? 0;
       final label = data['actionLabel'] as String? ?? '';

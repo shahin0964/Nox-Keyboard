@@ -3,6 +3,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../../themes/theme_model.dart';
 import '../../data/preferences_helper.dart';
+import '../../languages/language_manager.dart';
+import '../../services/ime_platform_bridge.dart';
 import '../layouts/keyboard_layout.dart';
 import '../engine/keyboard_engine.dart';
 import 'key_preview_popup.dart';
@@ -35,6 +37,7 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
   DateTime? _pointerDownTime;
   Offset _pointerDownPosition = Offset.zero;
   bool _hasTriggeredLongPress = false;
+  bool _hasDraggedSpace = false;
 
   @override
   void dispose() {
@@ -71,9 +74,9 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
     final size = renderBox.size;
     final char = _getEffectiveChar();
     final screenWidth = MediaQuery.of(context).size.width;
-    final popupWidth = size.width + 14;
-    final clampedLeft = (offset.dx - 7).clamp(2.0, (screenWidth - popupWidth - 2.0).clamp(2.0, screenWidth));
-    final clampedTop = (offset.dy - 38).clamp(2.0, double.infinity);
+    final popupWidth = size.width + 4;
+    final clampedLeft = (offset.dx - 2).clamp(2.0, (screenWidth - popupWidth - 2.0).clamp(2.0, screenWidth));
+    final clampedTop = (offset.dy - 44).clamp(2.0, double.infinity);
 
     _previewDismissTimer?.cancel();
     _previewEntry?.remove();
@@ -154,6 +157,7 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
     _pointerDownTime = DateTime.now();
     _pressReleaseTimer?.cancel();
     _hasTriggeredLongPress = false;
+    _hasDraggedSpace = false;
     setState(() => _isPressed = true);
 
     final k = widget.keyboardKey;
@@ -173,7 +177,12 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
         });
       });
     } else if (k.action == KeyAction.space) {
-      widget.engine.onKeyPress(k);
+      // Long-press spacebar switches language; swipe glides cursor; tap commits space on up
+      _longPressTimer = Timer(const Duration(milliseconds: 420), () {
+        _hasTriggeredLongPress = true;
+        ImePlatformBridge().performHaptic(20);
+        LanguageManager().cycleNextLanguage();
+      });
     } else {
       widget.engine.onKeyPress(k);
     }
@@ -182,13 +191,16 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
   void _onPointerMove(PointerMoveEvent event) {
     final distance = (event.position - _pointerDownPosition).distance;
 
-    if (distance > 24) {
+    if (distance > 16) {
       _longPressTimer?.cancel();
     }
 
     // Spacebar cursor glide
     if (widget.keyboardKey.action == KeyAction.space) {
       final delta = event.localDelta.dx;
+      if (distance > 12) {
+        _hasDraggedSpace = true;
+      }
       if (delta.abs() > 4) {
         widget.engine.onSpaceDragUpdate(DragUpdateDetails(
           globalPosition: event.position,
@@ -237,6 +249,11 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
         final charToCommit = _getEffectiveChar();
         widget.engine.onKeyPress(k.copyWith(primary: charToCommit));
       }
+    } else if (k.action == KeyAction.space) {
+      if (!_hasDraggedSpace && !_hasTriggeredLongPress) {
+        widget.engine.onKeyPress(k);
+      }
+      widget.engine.onSpaceDragEnd(DragEndDetails());
     }
   }
 
@@ -394,6 +411,10 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
     }
 
     if (k.action == KeyAction.space) {
+      final lang = LanguageManager().currentLanguage;
+      final label = lang.code == 'bn_BD'
+          ? (LanguageManager().isBanglaPhonetic ? 'বাংলা (অভ্র)' : 'বাংলা')
+          : lang.nativeName;
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -407,9 +428,9 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
           ),
           const SizedBox(width: 8),
           Text(
-            'English / বাংলা',
+            label,
             style: TextStyle(
-              color: widget.theme.secondaryTextColor.withOpacity(0.75),
+              color: widget.theme.secondaryTextColor.withOpacity(0.8),
               fontSize: 12,
               fontWeight: FontWeight.w500,
               letterSpacing: 0.3,

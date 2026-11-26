@@ -332,9 +332,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
         borderRadius: BorderRadius.circular(14),
         side: BorderSide(color: Colors.grey.withOpacity(0.15)),
       ),
-      child: InkWell(
+        child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        onTap: () => Navigator.of(context).pushNamed(route),
+        onTap: () {
+          Navigator.of(context).pushNamed(route).then((_) async {
+            await PreferencesHelper().reload();
+            _checkStatus();
+            _onStateChange();
+          });
+        },
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Column(

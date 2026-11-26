@@ -1,19 +1,25 @@
 package com.Nox.Keyboard
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import android.provider.Settings
 import android.view.inputmethod.InputMethodManager
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private val APP_CHANNEL = "com.nox.keyboard/app"
+    private var appChannel: MethodChannel? = null
+    private var pendingTargetRoute: String? = null
 
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
@@ -22,11 +28,41 @@ class MainActivity : FlutterActivity() {
                 preferredRefreshRate = 60.0f
             }
         }
+        handleIntentExtras(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIntentExtras(intent)
+    }
+
+    private fun handleIntentExtras(intent: Intent?) {
+        if (intent == null) return
+        val targetRoute = intent.getStringExtra("targetRoute")
+        if (!targetRoute.isNullOrEmpty()) {
+            pendingTargetRoute = targetRoute
+            appChannel?.invokeMethod("onNavigateRoute", targetRoute)
+            intent.removeExtra("targetRoute")
+        }
+        if (intent.getBooleanExtra("requestAudioPermission", false)) {
+            intent.removeExtra("requestAudioPermission")
+            requestAudioPermission()
+        }
+    }
+
+    private fun requestAudioPermission() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), 1001)
+        }
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, APP_CHANNEL).setMethodCallHandler { call, result ->
+        appChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, APP_CHANNEL)
+        appChannel?.setMethodCallHandler { call, result ->
             when (call.method) {
                 "isKeyboardEnabled" -> {
                     try {
@@ -66,6 +102,15 @@ class MainActivity : FlutterActivity() {
                     } catch (e: Exception) {
                         result.error("PICKER_ERROR", e.message, null)
                     }
+                }
+                "getInitialRouteExtra" -> {
+                    val r = pendingTargetRoute
+                    pendingTargetRoute = null
+                    result.success(r)
+                }
+                "requestAudioPermission" -> {
+                    requestAudioPermission()
+                    result.success(true)
                 }
                 "performHaptic" -> {
                     val durationMs = (call.argument<Int>("duration") ?: 20).toLong()

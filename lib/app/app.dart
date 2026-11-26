@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../core/constants/app_constants.dart';
 import '../data/preferences_helper.dart';
+import '../services/ime_platform_bridge.dart';
 import '../themes/theme_manager.dart';
+import '../languages/language_manager.dart';
 import 'routes.dart';
 import '../features/dashboard/screens/dashboard_screen.dart';
 import '../features/onboarding/screens/onboarding_screen.dart';
@@ -16,8 +18,52 @@ class NoxApp extends StatefulWidget {
   State<NoxApp> createState() => _NoxAppState();
 }
 
-class _NoxAppState extends State<NoxApp> {
+class _NoxAppState extends State<NoxApp> with WidgetsBindingObserver {
   final PreferencesHelper _prefs = PreferencesHelper();
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+  final ImePlatformBridge _bridge = ImePlatformBridge();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+
+    if (widget.initialRoute != AppRoutes.ime) {
+      _bridge.onNavigateRouteCallback = _handleNavigateRoute;
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        final extra = await _bridge.getInitialRouteExtra();
+        if (extra != null && extra.isNotEmpty) {
+          _handleNavigateRoute(extra);
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && widget.initialRoute != AppRoutes.ime) {
+      _reloadAppPrefs();
+    }
+  }
+
+  Future<void> _reloadAppPrefs() async {
+    await _prefs.reload();
+    await ThemeManager().init();
+    await LanguageManager().init();
+  }
+
+  void _handleNavigateRoute(String route) {
+    final nav = _navigatorKey.currentState;
+    if (nav != null) {
+      nav.pushNamed(route);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -51,6 +97,7 @@ class _NoxAppState extends State<NoxApp> {
     // Standard App Launch (Settings, Onboarding, Dashboard)
     // Fixed, consistent Material 3 app theme. Keyboard themes only affect the keyboard.
     return MaterialApp(
+      navigatorKey: _navigatorKey,
       title: AppConstants.appName,
       debugShowCheckedModeBanner: false,
       themeMode: ThemeMode.dark,

@@ -13,6 +13,11 @@ class PreferencesHelper {
     _prefs ??= await SharedPreferences.getInstance();
   }
 
+  Future<void> reload() async {
+    await init();
+    await _prefs?.reload();
+  }
+
   // Language settings
   String get selectedLanguage => _prefs?.getString(AppConstants.keySelectedLanguage) ?? 'en_US';
   Future<bool> setSelectedLanguage(String lang) async => await _prefs?.setString(AppConstants.keySelectedLanguage, lang) ?? false;

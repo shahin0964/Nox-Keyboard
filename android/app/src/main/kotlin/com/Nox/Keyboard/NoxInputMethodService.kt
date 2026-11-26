@@ -1,15 +1,23 @@
 package com.Nox.Keyboard
 
+import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.inputmethodservice.InputMethodService
 import android.media.AudioManager
 import android.os.Build
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
@@ -20,6 +28,7 @@ import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.text.InputType
 import android.widget.FrameLayout
+import androidx.core.content.ContextCompat
 import io.flutter.FlutterInjector
 import io.flutter.embedding.android.FlutterTextureView
 import io.flutter.embedding.android.FlutterView
@@ -32,6 +41,8 @@ class NoxInputMethodService : InputMethodService() {
     private var flutterView: FlutterView? = null
     private var inputContainer: InputViewContainer? = null
     private var channel: MethodChannel? = null
+    private var speechRecognizer: SpeechRecognizer? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     companion object {
         const val CHANNEL_NAME = "com.nox.keyboard/ime"
@@ -194,8 +205,33 @@ class NoxInputMethodService : InputMethodService() {
                     result.success(switched)
                 }
                 "openSettings" -> {
+                    requestHideSelf(0)
                     val intent = Intent(this@NoxInputMethodService, MainActivity::class.java).apply {
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                        putExtra("targetRoute", "/typing-settings")
+                    }
+                    startActivity(intent)
+                    result.success(true)
+                }
+                "performContextMenuAction" -> {
+                    val actionId = call.argument<Int>("actionId") ?: 0
+                    val ok = ic?.performContextMenuAction(actionId) ?: false
+                    result.success(ok)
+                }
+                "startVoiceRecognition" -> {
+                    val langCode = call.argument<String>("languageCode") ?: "en_US"
+                    val started = startVoiceRecognition(langCode)
+                    result.success(started)
+                }
+                "stopVoiceRecognition" -> {
+                    stopVoiceRecognition()
+                    result.success(true)
+                }
+                "requestAudioPermission" -> {
+                    requestHideSelf(0)
+                    val intent = Intent(this@NoxInputMethodService, MainActivity::class.java).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                        putExtra("requestAudioPermission", true)
                     }
                     startActivity(intent)
                     result.success(true)
@@ -346,7 +382,16 @@ class NoxInputMethodService : InputMethodService() {
         val isUri = (variation == InputType.TYPE_TEXT_VARIATION_URI)
 
         val beforeText = currentInputConnection?.getTextBeforeCursor(50, 0)?.toString() ?: ""
-        val navBarDp = inputContainer?.navBarHeightDp ?: 36f
+        val navBarDp = inputContainer?.navBarHeightDp ?: 60f
+        val clipboardText = try {
+            val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val clip = cm.primaryClip
+            if (clip != null && clip.itemCount > 0) {
+                clip.getItemAt(0).coerceToText(this@NoxInputMethodService)?.toString() ?: ""
+            } else ""
+        } catch (_: Exception) {
+            ""
+        }
 
         val data = hashMapOf<String, Any>(
             "inputType" to inputType,
@@ -359,7 +404,8 @@ class NoxInputMethodService : InputMethodService() {
             "isEmail" to isEmail,
             "isUri" to isUri,
             "textBeforeCursor" to beforeText,
-            "navBarHeightDp" to navBarDp
+            "navBarHeightDp" to navBarDp,
+            "clipboardText" to clipboardText
         )
 
         channel?.invokeMethod("onStartInput", data)
@@ -388,7 +434,97 @@ class NoxInputMethodService : InputMethodService() {
         } catch (_: Exception) {}
     }
 
+    private fun startVoiceRecognition(languageCode: String): Boolean {
+        val granted = ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!granted) {
+            channel?.invokeMethod("onVoiceError", "PERMISSION_REQUIRED")
+            return false
+        }
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            channel?.invokeMethod("onVoiceError", "UNAVAILABLE")
+            return false
+        }
+
+        val localeTag = when (languageCode) {
+            "bn_BD" -> "bn-BD"
+            "hi" -> "hi-IN"
+            "ar" -> "ar-SA"
+            "ur" -> "ur-PK"
+            else -> "en-US"
+        }
+
+        mainHandler.post {
+            try {
+                speechRecognizer?.destroy()
+                speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this).apply {
+                    setRecognitionListener(object : RecognitionListener {
+                        override fun onReadyForSpeech(params: Bundle?) {
+                            channel?.invokeMethod("onVoiceState", "listening")
+                        }
+                        override fun onBeginningOfSpeech() {
+                            channel?.invokeMethod("onVoiceState", "speaking")
+                        }
+                        override fun onRmsChanged(rmsdB: Float) {}
+                        override fun onBufferReceived(buffer: ByteArray?) {}
+                        override fun onEndOfSpeech() {
+                            channel?.invokeMethod("onVoiceState", "processing")
+                        }
+                        override fun onError(error: Int) {
+                            val msg = when (error) {
+                                SpeechRecognizer.ERROR_NO_MATCH,
+                                SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "NO_SPEECH"
+                                SpeechRecognizer.ERROR_NETWORK,
+                                SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "NETWORK"
+                                SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "PERMISSION_REQUIRED"
+                                else -> "ERROR_$error"
+                            }
+                            channel?.invokeMethod("onVoiceError", msg)
+                        }
+                        override fun onResults(results: Bundle?) {
+                            val list = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                            val text = list?.firstOrNull() ?: ""
+                            channel?.invokeMethod("onVoiceResult", hashMapOf("text" to text, "isFinal" to true))
+                        }
+                        override fun onPartialResults(partialResults: Bundle?) {
+                            val list = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                            val text = list?.firstOrNull() ?: ""
+                            if (text.isNotEmpty()) {
+                                channel?.invokeMethod("onVoiceResult", hashMapOf("text" to text, "isFinal" to false))
+                            }
+                        }
+                        override fun onEvent(eventType: Int, params: Bundle?) {}
+                    })
+                }
+                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                    putExtra(RecognizerIntent.EXTRA_LANGUAGE, localeTag)
+                    putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+                    putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+                }
+                speechRecognizer?.startListening(intent)
+            } catch (_: Exception) {
+                channel?.invokeMethod("onVoiceError", "UNAVAILABLE")
+            }
+        }
+        return true
+    }
+
+    private fun stopVoiceRecognition() {
+        mainHandler.post {
+            try {
+                speechRecognizer?.stopListening()
+            } catch (_: Exception) {}
+        }
+    }
+
     override fun onDestroy() {
+        try {
+            speechRecognizer?.destroy()
+            speechRecognizer = null
+        } catch (_: Exception) {}
         flutterView?.detachFromFlutterEngine()
         inputContainer?.removeAllViews()
         flutterView = null

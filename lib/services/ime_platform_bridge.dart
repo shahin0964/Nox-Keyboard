@@ -15,6 +15,10 @@ class ImePlatformBridge {
 
   InputChangeCallback? onStartInputCallback;
   VoidCallback? onFinishInputCallback;
+  void Function(String text, bool isFinal)? onVoiceResultCallback;
+  void Function(String error)? onVoiceErrorCallback;
+  void Function(String state)? onVoiceStateCallback;
+  void Function(String route)? onNavigateRouteCallback;
 
   // Mock input callback for in-app preview testing
   void Function(String text)? mockCommitCallback;
@@ -47,6 +51,32 @@ class ImePlatformBridge {
           break;
         case 'onFinishInput':
           onFinishInputCallback?.call();
+          break;
+        case 'onVoiceResult':
+          if (call.arguments is Map) {
+            final map = Map<String, dynamic>.from(call.arguments as Map);
+            onVoiceResultCallback?.call(
+              map['text'] as String? ?? '',
+              map['isFinal'] as bool? ?? false,
+            );
+          }
+          break;
+        case 'onVoiceError':
+          onVoiceErrorCallback?.call(call.arguments as String? ?? 'ERROR');
+          break;
+        case 'onVoiceState':
+          onVoiceStateCallback?.call(call.arguments as String? ?? 'idle');
+          break;
+      }
+    });
+
+    _appChannel.setMethodCallHandler((call) async {
+      switch (call.method) {
+        case 'onNavigateRoute':
+          final route = call.arguments as String?;
+          if (route != null && route.isNotEmpty) {
+            onNavigateRouteCallback?.call(route);
+          }
           break;
       }
     });
@@ -248,6 +278,44 @@ class ImePlatformBridge {
     try {
       await _appChannel.invokeMethod('openInputMethodSettings');
     } catch (_) {}
+  }
+
+  Future<void> performContextMenuAction(int actionId) async {
+    if (_isMockMode) return;
+    try {
+      await _imeChannel.invokeMethod('performContextMenuAction', {'actionId': actionId});
+    } catch (_) {}
+  }
+
+  Future<bool> startVoiceRecognition(String languageCode) async {
+    if (_isMockMode) return false;
+    try {
+      final res = await _imeChannel.invokeMethod<bool>('startVoiceRecognition', {'languageCode': languageCode});
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> stopVoiceRecognition() async {
+    if (_isMockMode) return;
+    try {
+      await _imeChannel.invokeMethod('stopVoiceRecognition');
+    } catch (_) {}
+  }
+
+  Future<void> requestAudioPermissionFromSettings() async {
+    try {
+      await _imeChannel.invokeMethod('requestAudioPermission');
+    } catch (_) {}
+  }
+
+  Future<String?> getInitialRouteExtra() async {
+    try {
+      return await _appChannel.invokeMethod<String>('getInitialRouteExtra');
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> showInputMethodPicker() async {

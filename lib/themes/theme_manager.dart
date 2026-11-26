@@ -43,6 +43,11 @@ class ThemeManager extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> reload() async {
+    await PreferencesHelper().reload();
+    await init();
+  }
+
   Future<void> setTheme(String themeId) async {
     if (_customThemes.containsKey(themeId)) {
       _currentTheme = _customThemes[themeId]!;
