@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../services/ime_platform_bridge.dart';
 import '../../../keyboard/widgets/keyboard_view.dart';
 import '../../../languages/language_manager.dart';
@@ -91,10 +92,71 @@ class _KeyboardPreviewScreenState extends State<KeyboardPreviewScreen> {
         const SnackBar(content: Text('Action Triggered! (Enter / Done / Search)'), duration: Duration(seconds: 1)),
       );
     };
+
+    _bridge.mockKeyCommandCallback = (cmd) async {
+      final text = _controller.text;
+      final sel = _controller.selection;
+      final hasSel = sel.isValid && sel.start >= 0 && sel.end > sel.start;
+      switch (cmd) {
+        case 'selectAll':
+          _controller.selection = TextSelection(baseOffset: 0, extentOffset: text.length);
+          return text.isNotEmpty;
+        case 'copyAll':
+          if (text.isEmpty) return false;
+          _controller.selection = TextSelection(baseOffset: 0, extentOffset: text.length);
+          await Clipboard.setData(ClipboardData(text: text));
+          return true;
+        case 'copy':
+          if (!hasSel) return false;
+          await Clipboard.setData(ClipboardData(text: sel.textInside(text)));
+          return true;
+        case 'cut':
+          if (!hasSel) return false;
+          await Clipboard.setData(ClipboardData(text: sel.textInside(text)));
+          final updated = text.replaceRange(sel.start, sel.end, '');
+          _controller.value = TextEditingValue(
+            text: updated,
+            selection: TextSelection.collapsed(offset: sel.start),
+          );
+          return true;
+        case 'paste':
+          final data = await Clipboard.getData(Clipboard.kTextPlain);
+          final clip = data?.text ?? '';
+          if (clip.isEmpty) return false;
+          final start = sel.isValid && sel.start >= 0 ? sel.start : text.length;
+          final end = sel.isValid && sel.end >= start ? sel.end : start;
+          final updated = text.replaceRange(start, end, clip);
+          _controller.value = TextEditingValue(
+            text: updated,
+            selection: TextSelection.collapsed(offset: start + clip.length),
+          );
+          return true;
+        case 'clearAll':
+          _controller.clear();
+          return true;
+        case 'home':
+          _controller.selection = const TextSelection.collapsed(offset: 0);
+          return true;
+        case 'end':
+          _controller.selection = TextSelection.collapsed(offset: text.length);
+          return true;
+        case 'left':
+          final posL = (sel.isValid ? sel.baseOffset - 1 : 0).clamp(0, text.length);
+          _controller.selection = TextSelection.collapsed(offset: posL);
+          return true;
+        case 'right':
+          final posR = (sel.isValid ? sel.extentOffset + 1 : text.length).clamp(0, text.length);
+          _controller.selection = TextSelection.collapsed(offset: posR);
+          return true;
+        default:
+          return false;
+      }
+    };
   }
 
   @override
   void dispose() {
+    _bridge.mockKeyCommandCallback = null;
     _bridge.setMockMode(false);
     _controller.dispose();
     super.dispose();

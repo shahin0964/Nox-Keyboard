@@ -192,11 +192,11 @@ class ToolbarWidget extends StatelessWidget {
           const SizedBox(width: 6),
           Expanded(
             child: Text(
-              'KEY MODE • C Copy • V Paste • X Cut • A All',
+              engine.keyCommandFeedback ?? 'KEY MODE • C Copy • V Paste • X Cut • A All',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: theme.textColor,
+                color: engine.keyCommandFeedback != null ? theme.accentColor : theme.textColor,
                 fontSize: 11.5,
                 fontWeight: FontWeight.w600,
               ),

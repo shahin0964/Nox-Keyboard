@@ -722,14 +722,80 @@ class NoxInputMethodService : InputMethodService() {
 
     private fun executeKeyCommand(cmd: String, ic: android.view.inputmethod.InputConnection?): Boolean {
         if (ic == null) return false
+        val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         return when (cmd) {
-            "copy" -> ic.performContextMenuAction(android.R.id.copy)
-            "paste" -> ic.performContextMenuAction(android.R.id.paste)
-            "cut" -> ic.performContextMenuAction(android.R.id.cut)
-            "selectAll" -> ic.performContextMenuAction(android.R.id.selectAll)
+            "copy" -> {
+                val selected = ic.getSelectedText(0)?.toString()
+                if (!selected.isNullOrEmpty()) {
+                    cm.setPrimaryClip(ClipData.newPlainText("Nox Keyboard", selected))
+                    true
+                } else {
+                    val ok = ic.performContextMenuAction(android.R.id.copy)
+                    if (!ok) sendMetaKey(KeyEvent.KEYCODE_C, KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON)
+                    ok
+                }
+            }
+            "paste" -> {
+                val clipText = try {
+                    val clip = cm.primaryClip
+                    if (clip != null && clip.itemCount > 0) {
+                        clip.getItemAt(0).coerceToText(this@NoxInputMethodService)?.toString()
+                    } else null
+                } catch (_: Exception) {
+                    null
+                }
+                if (!clipText.isNullOrEmpty()) {
+                    ic.finishComposingText()
+                    ic.commitText(clipText, 1)
+                    true
+                } else {
+                    val ok = ic.performContextMenuAction(android.R.id.paste)
+                    if (!ok) sendMetaKey(KeyEvent.KEYCODE_V, KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON)
+                    ok
+                }
+            }
+            "cut" -> {
+                val selected = ic.getSelectedText(0)?.toString()
+                if (!selected.isNullOrEmpty()) {
+                    cm.setPrimaryClip(ClipData.newPlainText("Nox Keyboard", selected))
+                    ic.commitText("", 1)
+                    true
+                } else {
+                    val ok = ic.performContextMenuAction(android.R.id.cut)
+                    if (!ok) sendMetaKey(KeyEvent.KEYCODE_X, KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON)
+                    ok
+                }
+            }
+            "selectAll" -> {
+                var ok = ic.performContextMenuAction(android.R.id.selectAll)
+                if (!ok || ic.getSelectedText(0).isNullOrEmpty()) {
+                    val ext = ic.getExtractedText(android.view.inputmethod.ExtractedTextRequest(), 0)
+                    if (ext?.text != null) {
+                        ok = ic.setSelection(0, ext.text.length)
+                    } else {
+                        sendMetaKey(KeyEvent.KEYCODE_A, KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON)
+                        ok = true
+                    }
+                }
+                ok
+            }
             "copyAll" -> {
-                ic.performContextMenuAction(android.R.id.selectAll)
-                ic.performContextMenuAction(android.R.id.copy)
+                val ext = ic.getExtractedText(android.view.inputmethod.ExtractedTextRequest(), 0)?.text?.toString()
+                val full = if (!ext.isNullOrEmpty()) {
+                    ext
+                } else {
+                    val before = ic.getTextBeforeCursor(5000, 0)?.toString() ?: ""
+                    val after = ic.getTextAfterCursor(5000, 0)?.toString() ?: ""
+                    before + after
+                }
+                if (full.isNotEmpty()) {
+                    cm.setPrimaryClip(ClipData.newPlainText("Nox Keyboard", full))
+                    ic.setSelection(0, full.length)
+                    true
+                } else {
+                    ic.performContextMenuAction(android.R.id.selectAll)
+                    ic.performContextMenuAction(android.R.id.copy)
+                }
             }
             "undo" -> {
                 val handled = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -763,8 +829,14 @@ class NoxInputMethodService : InputMethodService() {
                 true
             }
             "clearAll" -> {
-                ic.performContextMenuAction(android.R.id.selectAll)
-                sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
+                val beforeLen = ic.getTextBeforeCursor(5000, 0)?.length ?: 0
+                val afterLen = ic.getTextAfterCursor(5000, 0)?.length ?: 0
+                if (beforeLen > 0 || afterLen > 0) {
+                    ic.deleteSurroundingText(beforeLen, afterLen)
+                } else {
+                    ic.performContextMenuAction(android.R.id.selectAll)
+                    sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
+                }
                 true
             }
             "home" -> {

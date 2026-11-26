@@ -72,6 +72,10 @@ class KeyboardEngine extends ChangeNotifier {
   bool _isKeyCommandMode = false;
   bool get isKeyCommandMode => _isKeyCommandMode;
 
+  String? _keyCommandFeedback;
+  String? get keyCommandFeedback => _keyCommandFeedback;
+  int _keyFeedbackToken = 0;
+
   int _actionId = 0;
   String _actionLabel = 'ENTER';
   String get actionLabel => _actionLabel;
@@ -363,7 +367,19 @@ class KeyboardEngine extends ChangeNotifier {
     return null;
   }
 
-  void _handleKeyCommand(String char) {
+  void _setKeyFeedback(String msg) {
+    final token = ++_keyFeedbackToken;
+    _keyCommandFeedback = msg;
+    notifyListeners();
+    Future.delayed(const Duration(milliseconds: 1400), () {
+      if (token == _keyFeedbackToken && _keyCommandFeedback != null) {
+        _keyCommandFeedback = null;
+        notifyListeners();
+      }
+    });
+  }
+
+  Future<void> _handleKeyCommand(String char) async {
     final clean = char.trim().toLowerCase();
     final mapping = _prefs.keyCommandsMap[clean];
     if (mapping == null || mapping.isEmpty) {
@@ -371,16 +387,36 @@ class KeyboardEngine extends ChangeNotifier {
     }
     if (mapping.startsWith('action:')) {
       final cmd = mapping.substring(7);
-      _bridge.executeKeyCommand(cmd);
+      final ok = await _bridge.executeKeyCommand(cmd);
+      if (cmd == 'copy' || cmd == 'cut' || cmd == 'copyAll') {
+        if (ok) {
+          final clip = await _bridge.getClipboardText();
+          if (clip.trim().isNotEmpty) {
+            await _prefs.addClipboardItem(clip.trim());
+          }
+          _setKeyFeedback(cmd == 'cut' ? '✓ Cut to clipboard' : '✓ Copied to clipboard');
+        } else {
+          _setKeyFeedback('Select text first to $cmd');
+        }
+      } else if (cmd == 'paste') {
+        _setKeyFeedback(ok ? '✓ Pasted' : 'Clipboard empty');
+      } else if (cmd == 'selectAll') {
+        _setKeyFeedback(ok ? '✓ Selected all' : 'No text to select');
+      } else {
+        final label = _actionShortLabels[mapping] ?? cmd;
+        _setKeyFeedback(ok ? '✓ $label' : '$label unavailable');
+      }
     } else if (mapping.startsWith('text:')) {
       final txt = mapping.substring(5);
       if (txt.isNotEmpty) {
-        _bridge.commitText(txt);
+        await _bridge.commitText(txt);
         _appendToSentenceBuffer(txt);
+        _setKeyFeedback('✓ Inserted snippet');
       }
     }
     if (!_prefs.keyModeStayActive) {
       _isKeyCommandMode = false;
+      _keyCommandFeedback = null;
       _gridRevision++;
       notifyListeners();
     }

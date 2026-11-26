@@ -27,6 +27,7 @@ class ImePlatformBridge {
   void Function(String text)? mockComposingCallback;
   void Function()? mockDeleteBackwardCallback;
   void Function(int action)? mockActionCallback;
+  Future<bool> Function(String command)? mockKeyCommandCallback;
 
   bool _isMockMode = false;
   bool get isMockMode => _isMockMode;
@@ -375,8 +376,8 @@ class ImePlatformBridge {
 
   Future<bool> executeKeyCommand(String command) async {
     if (_isMockMode) {
-      if (command == 'selectAll' || command == 'copy' || command == 'cut' || command == 'paste') {
-        return true;
+      if (mockKeyCommandCallback != null) {
+        return await mockKeyCommandCallback!(command);
       }
       return false;
     }

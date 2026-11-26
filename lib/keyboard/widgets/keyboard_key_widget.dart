@@ -180,7 +180,7 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
 
     if (k.action == KeyAction.character) {
       _showPreviewPopup();
-      if (k.alternateChars.isNotEmpty) {
+      if (k.alternateChars.isNotEmpty && !widget.engine.isKeyCommandMode) {
         _longPressTimer = Timer(const Duration(milliseconds: 340), () {
           _showAlternatesPopup();
         });
