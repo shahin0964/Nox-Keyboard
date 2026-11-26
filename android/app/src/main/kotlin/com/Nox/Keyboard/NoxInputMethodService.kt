@@ -42,11 +42,14 @@ class NoxInputMethodService : InputMethodService() {
      * This lifts all keys completely above the Android navigation gesture pill and keyboard switcher.
      */
     class InputViewContainer(context: Context) : FrameLayout(context) {
-        var contentHeightDp: Float = 224f
-        var navBarHeightDp: Float = 36f
+        var contentHeightDp: Float = 260f
+        var navBarHeightDp: Float = 60f
 
         init {
-            navBarHeightDp = detectNavBarHeightDp()
+            val detected = detectNavBarHeightDp()
+            if (detected > 60f) {
+                navBarHeightDp = detected
+            }
         }
 
         private fun detectNavBarHeightDp(): Float {

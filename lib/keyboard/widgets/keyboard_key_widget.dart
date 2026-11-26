@@ -30,6 +30,7 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
   OverlayEntry? _alternatesEntry;
   Timer? _longPressTimer;
   Timer? _repeatTimer;
+  Timer? _previewDismissTimer;
   Offset _pointerDownPosition = Offset.zero;
   bool _hasTriggeredLongPress = false;
 
@@ -37,6 +38,7 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
   void dispose() {
     _longPressTimer?.cancel();
     _repeatTimer?.cancel();
+    _previewDismissTimer?.cancel();
     _removeOverlays();
     super.dispose();
   }
@@ -48,6 +50,13 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
     _alternatesEntry = null;
   }
 
+  String _getEffectiveChar() {
+    final k = widget.keyboardKey;
+    if (k.action != KeyAction.character) return k.primary;
+    final isShifted = widget.engine.isShifted || widget.engine.isCapsLock;
+    return isShifted ? k.primary.toUpperCase() : k.primary;
+  }
+
   void _showPreviewPopup() {
     if (!PreferencesHelper().popupOnKeypress) return;
     if (widget.keyboardKey.action != KeyAction.character) return;
@@ -57,15 +66,17 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
 
     final offset = renderBox.localToGlobal(Offset.zero);
     final size = renderBox.size;
+    final char = _getEffectiveChar();
 
+    _previewDismissTimer?.cancel();
     _previewEntry?.remove();
     _previewEntry = OverlayEntry(
       builder: (context) {
         return Positioned(
-          left: offset.dx - 4,
-          top: offset.dy - 26,
+          left: offset.dx - 6,
+          top: offset.dy - 32,
           child: KeyPreviewPopup(
-            label: widget.keyboardKey.primary,
+            label: char,
             theme: widget.theme,
             keyWidth: size.width,
             keyHeight: size.height,
@@ -77,9 +88,13 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
     Overlay.of(context).insert(_previewEntry!);
   }
 
-  void _hidePreviewPopup() {
-    _previewEntry?.remove();
-    _previewEntry = null;
+  void _schedulePreviewDismiss() {
+    _previewDismissTimer?.cancel();
+    // Keep the Gboard preview bubble visible for 130ms so it floats up and fades visibly
+    _previewDismissTimer = Timer(const Duration(milliseconds: 130), () {
+      _previewEntry?.remove();
+      _previewEntry = null;
+    });
   }
 
   void _showAlternatesPopup() {
@@ -92,7 +107,10 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
     final offset = renderBox.localToGlobal(Offset.zero);
     final size = renderBox.size;
 
-    _hidePreviewPopup();
+    _previewDismissTimer?.cancel();
+    _previewEntry?.remove();
+    _previewEntry = null;
+
     _alternatesEntry?.remove();
     _hasTriggeredLongPress = true;
 
@@ -185,14 +203,15 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
   void _onPointerUp(PointerUpEvent event) {
     _longPressTimer?.cancel();
     _repeatTimer?.cancel();
-    _hidePreviewPopup();
+    _schedulePreviewDismiss();
     setState(() => _isPressed = false);
 
     final k = widget.keyboardKey;
 
     if (k.action == KeyAction.character) {
       if (!_hasTriggeredLongPress) {
-        widget.engine.onKeyPress(k);
+        final charToCommit = _getEffectiveChar();
+        widget.engine.onKeyPress(k.copyWith(primary: charToCommit));
       }
     }
   }
@@ -200,14 +219,15 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
   void _onPointerCancel(PointerCancelEvent event) {
     _longPressTimer?.cancel();
     _repeatTimer?.cancel();
-    _hidePreviewPopup();
+    _schedulePreviewDismiss();
     setState(() => _isPressed = false);
 
     final k = widget.keyboardKey;
     if (k.action == KeyAction.character) {
       final distance = (event.position - _pointerDownPosition).distance;
       if (distance < 20 && !_hasTriggeredLongPress) {
-        widget.engine.onKeyPress(k);
+        final charToCommit = _getEffectiveChar();
+        widget.engine.onKeyPress(k.copyWith(primary: charToCommit));
       }
     }
   }
@@ -223,7 +243,7 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
 
     // Pill styling for action keys
     final double borderRadius = isSpecial
-        ? 20.0
+        ? 22.0
         : widget.theme.keyBorderRadius;
 
     Color bg;
@@ -241,48 +261,54 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
 
     Widget content = _buildKeyContent(k, isShiftActive);
 
-    Widget keyContainer = Container(
-      margin: EdgeInsets.symmetric(
-        horizontal: widget.theme.keyMarginH,
-        vertical: widget.theme.keyMarginV,
-      ),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(borderRadius),
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            _isPressed
-                ? Colors.transparent
-                : Colors.white.withOpacity(widget.theme.isDark ? 0.06 : 0.4),
-            Colors.transparent,
+    // Key container with visible scale bounce animation on tap
+    Widget keyContainer = AnimatedScale(
+      scale: _isPressed ? 0.90 : 1.0,
+      duration: const Duration(milliseconds: 60),
+      curve: Curves.easeOutCubic,
+      child: Container(
+        margin: EdgeInsets.symmetric(
+          horizontal: widget.theme.keyMarginH,
+          vertical: widget.theme.keyMarginV,
+        ),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(borderRadius),
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              _isPressed
+                  ? Colors.transparent
+                  : Colors.white.withOpacity(widget.theme.isDark ? 0.06 : 0.4),
+              Colors.transparent,
+            ],
+          ),
+          border: Border.all(
+            color: isEnter
+                ? widget.theme.accentColor.withOpacity(0.6)
+                : (widget.theme.keyBorderWidth > 0
+                    ? widget.theme.keyBorderColor
+                    : Colors.white.withOpacity(widget.theme.isDark ? 0.08 : 0.18)),
+            width: isEnter ? 1.2 : (widget.theme.keyBorderWidth > 0 ? widget.theme.keyBorderWidth : 0.8),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(widget.theme.isDark ? 0.3 : 0.08),
+              offset: const Offset(0, 1.5),
+              blurRadius: 1.5,
+            ),
+            if (isEnter)
+              BoxShadow(
+                color: widget.theme.accentColor.withOpacity(0.2),
+                blurRadius: 5,
+                offset: const Offset(0, 1),
+              ),
           ],
         ),
-        border: Border.all(
-          color: isEnter
-              ? widget.theme.accentColor.withOpacity(0.6)
-              : (widget.theme.keyBorderWidth > 0
-                  ? widget.theme.keyBorderColor
-                  : Colors.white.withOpacity(widget.theme.isDark ? 0.08 : 0.18)),
-          width: isEnter ? 1.2 : (widget.theme.keyBorderWidth > 0 ? widget.theme.keyBorderWidth : 0.8),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(widget.theme.isDark ? 0.3 : 0.08),
-            offset: const Offset(0, 1.5),
-            blurRadius: 1.5,
-          ),
-          if (isEnter)
-            BoxShadow(
-              color: widget.theme.accentColor.withOpacity(0.2),
-              blurRadius: 5,
-              offset: const Offset(0, 1),
-            ),
-        ],
+        alignment: Alignment.center,
+        child: content,
       ),
-      alignment: Alignment.center,
-      child: content,
     );
 
     return Expanded(
@@ -406,14 +432,15 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
       );
     }
 
-    // Standard character key
+    // Standard character key with dynamic Shift Uppercase / Lowercase rendering
     final hasSecondary = k.secondary != null;
+    final displayChar = _getEffectiveChar();
 
     return Stack(
       children: [
         Center(
           child: Text(
-            k.primary,
+            displayChar,
             style: TextStyle(
               color: widget.theme.textColor,
               fontSize: widget.theme.fontSize,

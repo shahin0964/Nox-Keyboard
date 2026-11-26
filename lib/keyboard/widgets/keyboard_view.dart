@@ -38,11 +38,11 @@ class _NoxFirebaseViewState extends State<NoxKeyboardView> {
     _engine.addListener(_onEngineUpdate);
     _themeManager.addListener(_onThemeUpdate);
 
-    // Sync compact Gboard dimensions (224dp content + 36dp nav bar padding) with Android InputMethodService
+    // Sync taller key area (260dp content) + generous 60dp navigation bar clearance with native Android
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _bridge.updateKeyboardDimensions(
-        contentHeight: 224.0,
-        navBarHeight: _bridge.navBarHeightDp,
+        contentHeight: 260.0,
+        navBarHeight: 60.0,
       );
     });
   }
@@ -65,8 +65,8 @@ class _NoxFirebaseViewState extends State<NoxKeyboardView> {
   @override
   Widget build(BuildContext context) {
     final theme = _themeManager.currentTheme;
-    // Bottom navigation inset to prevent Android gesture bar/pill from overlapping spacebar & keys
-    final double navBarPadding = widget.isImeMode ? _bridge.navBarHeightDp : 0.0;
+    // Generous 60dp bottom navigation clearance so no keys touch the Android gesture bar or switcher
+    final double navBarPadding = widget.isImeMode ? 60.0 : 0.0;
 
     Widget mainContent;
     switch (_engine.activePanel) {
@@ -96,13 +96,13 @@ class _NoxFirebaseViewState extends State<NoxKeyboardView> {
     Widget keyboardBody = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Single unified Gboard header bar (contains suggestions or toolbar + mic on right)
+        // Single unified Gboard header bar (suggestions or toolbar + mic on right)
         ToolbarWidget(engine: _engine, theme: theme),
         SizedBox(
-          height: 184.0, // Key area height
+          height: 220.0, // Taller, comfortable, and spacious key area (as requested)
           child: mainContent,
         ),
-        // Dedicated Android navigation bar padding zone (lifts spacebar & keys above gesture bar)
+        // Dedicated 60dp navigation bar padding zone (lifts spacebar & keys completely above navigation bar)
         if (navBarPadding > 0)
           SizedBox(height: navBarPadding),
       ],
