@@ -15,6 +15,7 @@ import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.Window
+import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.text.InputType
@@ -103,6 +104,7 @@ class NoxInputMethodService : InputMethodService() {
 
             channel = MethodChannel(flutterEngine!!.dartExecutor.binaryMessenger, CHANNEL_NAME)
             setupChannelHandlers()
+            flutterEngine?.lifecycleChannel?.appIsResumed()
         }
     }
 
@@ -261,6 +263,7 @@ class NoxInputMethodService : InputMethodService() {
 
     override fun onConfigureWindow(win: Window, isFullscreen: Boolean, isCandidatesOnly: Boolean) {
         super.onConfigureWindow(win, isFullscreen, isCandidatesOnly)
+        win.addFlags(WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED)
         win.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
         win.setGravity(Gravity.BOTTOM)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -293,12 +296,35 @@ class NoxInputMethodService : InputMethodService() {
                     ViewGroup.LayoutParams.MATCH_PARENT
                 )
             )
+        } else {
+            (inputContainer?.parent as? ViewGroup)?.removeView(inputContainer)
         }
+        flutterEngine?.lifecycleChannel?.appIsResumed()
         return inputContainer!!
+    }
+
+    override fun onWindowShown() {
+        super.onWindowShown()
+        flutterEngine?.lifecycleChannel?.appIsResumed()
+        flutterView?.let { fv ->
+            if (!fv.isAttachedToFlutterEngine() && flutterEngine != null) {
+                fv.attachToFlutterEngine(flutterEngine!!)
+            }
+            fv.requestLayout()
+            fv.invalidate()
+        }
+        inputContainer?.requestLayout()
+    }
+
+    override fun onWindowHidden() {
+        flutterEngine?.lifecycleChannel?.appIsInactive()
+        super.onWindowHidden()
     }
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
+        flutterEngine?.lifecycleChannel?.appIsResumed()
+        flutterView?.invalidate()
         if (info == null) return
 
         val inputType = info.inputType

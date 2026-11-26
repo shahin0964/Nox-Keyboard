@@ -31,6 +31,8 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
   Timer? _longPressTimer;
   Timer? _repeatTimer;
   Timer? _previewDismissTimer;
+  Timer? _pressReleaseTimer;
+  DateTime? _pointerDownTime;
   Offset _pointerDownPosition = Offset.zero;
   bool _hasTriggeredLongPress = false;
 
@@ -39,6 +41,7 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
     _longPressTimer?.cancel();
     _repeatTimer?.cancel();
     _previewDismissTimer?.cancel();
+    _pressReleaseTimer?.cancel();
     _removeOverlays();
     super.dispose();
   }
@@ -67,14 +70,18 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
     final offset = renderBox.localToGlobal(Offset.zero);
     final size = renderBox.size;
     final char = _getEffectiveChar();
+    final screenWidth = MediaQuery.of(context).size.width;
+    final popupWidth = size.width + 14;
+    final clampedLeft = (offset.dx - 7).clamp(2.0, (screenWidth - popupWidth - 2.0).clamp(2.0, screenWidth));
+    final clampedTop = (offset.dy - 38).clamp(2.0, double.infinity);
 
     _previewDismissTimer?.cancel();
     _previewEntry?.remove();
     _previewEntry = OverlayEntry(
       builder: (context) {
         return Positioned(
-          left: offset.dx - 6,
-          top: offset.dy - 32,
+          left: clampedLeft,
+          top: clampedTop,
           child: KeyPreviewPopup(
             label: char,
             theme: widget.theme,
@@ -144,6 +151,8 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
 
   void _onPointerDown(PointerDownEvent event) {
     _pointerDownPosition = event.position;
+    _pointerDownTime = DateTime.now();
+    _pressReleaseTimer?.cancel();
     _hasTriggeredLongPress = false;
     setState(() => _isPressed = true);
 
@@ -200,11 +209,26 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
     }
   }
 
+  void _releasePressState() {
+    _pressReleaseTimer?.cancel();
+    final elapsedMs = _pointerDownTime == null
+        ? 85
+        : DateTime.now().difference(_pointerDownTime!).inMilliseconds;
+    final remaining = 85 - elapsedMs;
+    if (remaining <= 0) {
+      if (mounted) setState(() => _isPressed = false);
+    } else {
+      _pressReleaseTimer = Timer(Duration(milliseconds: remaining), () {
+        if (mounted) setState(() => _isPressed = false);
+      });
+    }
+  }
+
   void _onPointerUp(PointerUpEvent event) {
     _longPressTimer?.cancel();
     _repeatTimer?.cancel();
     _schedulePreviewDismiss();
-    setState(() => _isPressed = false);
+    _releasePressState();
 
     final k = widget.keyboardKey;
 
@@ -220,7 +244,7 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
     _longPressTimer?.cancel();
     _repeatTimer?.cancel();
     _schedulePreviewDismiss();
-    setState(() => _isPressed = false);
+    _releasePressState();
 
     final k = widget.keyboardKey;
     if (k.action == KeyAction.character) {

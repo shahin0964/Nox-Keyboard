@@ -23,22 +23,17 @@ class _KeyPreviewPopupState extends State<KeyPreviewPopup>
     with SingleTickerProviderStateMixin {
   late AnimationController _animController;
   late Animation<double> _scaleAnimation;
-  late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
     _animController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 90),
+      duration: const Duration(milliseconds: 55),
     );
 
-    _scaleAnimation = Tween<double>(begin: 0.75, end: 1.0).animate(
+    _scaleAnimation = Tween<double>(begin: 0.82, end: 1.0).animate(
       CurvedAnimation(parent: _animController, curve: Curves.easeOutBack),
-    );
-
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animController, curve: Curves.easeOut),
     );
 
     _animController.forward();
@@ -53,58 +48,58 @@ class _KeyPreviewPopupState extends State<KeyPreviewPopup>
   @override
   Widget build(BuildContext context) {
     final theme = widget.theme;
-    final double popupWidth = widget.keyWidth + 12;
-    final double popupHeight = widget.keyHeight + 32;
+    final double popupWidth = widget.keyWidth + 14;
+    final double popupHeight = widget.keyHeight + 38;
+    final Color popupBg = theme.isDark
+        ? (Color.lerp(theme.keyPressedColor, Colors.white, 0.14) ?? theme.keyPressedColor)
+        : theme.keyPressedColor;
 
     return Material(
       color: Colors.transparent,
-      child: FadeTransition(
-        opacity: _fadeAnimation,
-        child: ScaleTransition(
-          scale: _scaleAnimation,
-          alignment: Alignment.bottomCenter,
-          child: Container(
-            width: popupWidth,
-            height: popupHeight,
-            decoration: BoxDecoration(
-              color: theme.keyPressedColor,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: theme.accentColor.withOpacity(0.55),
-                width: 1.2,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(theme.isDark ? 0.5 : 0.2),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-                BoxShadow(
-                  color: theme.accentColor.withOpacity(0.18),
-                  blurRadius: 6,
-                  offset: const Offset(0, 1),
-                ),
-              ],
+      child: ScaleTransition(
+        scale: _scaleAnimation,
+        alignment: Alignment.bottomCenter,
+        child: Container(
+          width: popupWidth,
+          height: popupHeight,
+          decoration: BoxDecoration(
+            color: popupBg,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: theme.accentColor.withOpacity(0.7),
+              width: 1.3,
             ),
-            child: Column(
-              children: [
-                // Top floating magnified character (Gboard Magnifier)
-                Container(
-                  height: 38,
-                  alignment: Alignment.center,
-                  child: Text(
-                    widget.label,
-                    style: TextStyle(
-                      color: theme.textColor,
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: -0.5,
-                    ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(theme.isDark ? 0.55 : 0.22),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+              BoxShadow(
+                color: theme.accentColor.withOpacity(0.22),
+                blurRadius: 6,
+                offset: const Offset(0, 1),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              // Top floating magnified character (Gboard Magnifier)
+              Container(
+                height: 44,
+                alignment: Alignment.center,
+                child: Text(
+                  widget.label,
+                  style: TextStyle(
+                    color: theme.textColor,
+                    fontSize: 29,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: -0.5,
                   ),
                 ),
-                const Spacer(),
-              ],
-            ),
+              ),
+              const Spacer(),
+            ],
           ),
         ),
       ),

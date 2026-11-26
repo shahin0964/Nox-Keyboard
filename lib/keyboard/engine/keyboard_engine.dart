@@ -107,6 +107,7 @@ class KeyboardEngine extends ChangeNotifier {
       _actionLabel = label.isNotEmpty ? label : _resolveActionLabel(_actionId);
       _contextBefore = data['textBeforeCursor'] as String? ?? '';
       _composingWord = '';
+      _forceShowToolbar = false;
       _updateSuggestions();
       notifyListeners();
     };
@@ -115,6 +116,7 @@ class KeyboardEngine extends ChangeNotifier {
       _composingWord = '';
       _candidates.clear();
       _activePanel = KeyboardPanel.none;
+      _forceShowToolbar = false;
       notifyListeners();
     };
   }
@@ -246,6 +248,7 @@ class KeyboardEngine extends ChangeNotifier {
 
   void _handleCharacter(String char) {
     final lang = _langManager.currentLanguage;
+    _forceShowToolbar = false;
 
     if (lang.code == 'bn_BD' && _langManager.isBanglaPhonetic && _mode == KeyboardMode.letters) {
       // In Bangla Phonetic: accumulate roman characters and compute phonetic output
