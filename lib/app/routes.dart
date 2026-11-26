@@ -16,6 +16,7 @@ import '../features/emoji/screens/emoji_screen.dart';
 import '../features/voice/screens/voice_typing_screen.dart';
 import '../features/privacy/screens/privacy_screen.dart';
 import '../features/settings/screens/about_screen.dart';
+import '../features/settings/screens/update_screen.dart';
 
 class AppRoutes {
   static const String root = '/';
@@ -36,6 +37,7 @@ class AppRoutes {
   static const String voiceSettings = '/voice-settings';
   static const String privacy = '/privacy';
   static const String about = '/about';
+  static const String updates = '/updates';
 
   static Map<String, WidgetBuilder> get routes => {
     ime: (context) => const NoxKeyboardView(isImeMode: true),
@@ -55,5 +57,6 @@ class AppRoutes {
     voiceSettings: (context) => const VoiceTypingScreen(),
     privacy: (context) => const PrivacyScreen(),
     about: (context) => const AboutScreen(),
+    updates: (context) => const UpdateScreen(),
   };
 }

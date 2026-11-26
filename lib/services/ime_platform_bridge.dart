@@ -19,6 +19,8 @@ class ImePlatformBridge {
   void Function(String error)? onVoiceErrorCallback;
   void Function(String state)? onVoiceStateCallback;
   void Function(String route)? onNavigateRouteCallback;
+  void Function(int percent, int downloaded, int total)? onOtaProgressCallback;
+  void Function(String status, String message)? onOtaCompleteCallback;
 
   // Mock input callback for in-app preview testing
   void Function(String text)? mockCommitCallback;
@@ -77,6 +79,25 @@ class ImePlatformBridge {
           final route = call.arguments as String?;
           if (route != null && route.isNotEmpty) {
             onNavigateRouteCallback?.call(route);
+          }
+          break;
+        case 'onOtaProgress':
+          if (call.arguments is Map) {
+            final map = Map<String, dynamic>.from(call.arguments as Map);
+            onOtaProgressCallback?.call(
+              (map['percent'] as num?)?.toInt() ?? 0,
+              (map['downloaded'] as num?)?.toInt() ?? 0,
+              (map['total'] as num?)?.toInt() ?? 0,
+            );
+          }
+          break;
+        case 'onOtaComplete':
+          if (call.arguments is Map) {
+            final map = Map<String, dynamic>.from(call.arguments as Map);
+            onOtaCompleteCallback?.call(
+              map['status'] as String? ?? 'FAILED',
+              map['message'] as String? ?? '',
+            );
           }
           break;
       }
@@ -384,6 +405,72 @@ class ImePlatformBridge {
   Future<void> showInputMethodPicker() async {
     try {
       await _appChannel.invokeMethod('showInputMethodPicker');
+    } catch (_) {}
+  }
+
+  // OTA App Update methods
+  Future<String> getAppVersion() async {
+    try {
+      final res = await _appChannel.invokeMethod<String>('getAppVersion');
+      return res ?? AppConstants.appVersion;
+    } catch (_) {
+      return AppConstants.appVersion;
+    }
+  }
+
+  Future<Map<String, dynamic>> checkForUpdate({bool notify = false}) async {
+    try {
+      final res = await _appChannel.invokeMethod<Map<dynamic, dynamic>>('checkForUpdate', {'notify': notify});
+      if (res != null) return Map<String, dynamic>.from(res);
+    } catch (_) {}
+    return {'success': false, 'error': 'Unable to check', 'hasUpdate': false};
+  }
+
+  Future<void> downloadAndInstallUpdate(String url, String tag) async {
+    try {
+      await _appChannel.invokeMethod('downloadAndInstallUpdate', {'url': url, 'tag': tag});
+    } catch (_) {}
+  }
+
+  Future<bool> canRequestPackageInstalls() async {
+    try {
+      return await _appChannel.invokeMethod<bool>('canRequestPackageInstalls') ?? true;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  Future<void> openInstallPermissionSettings() async {
+    try {
+      await _appChannel.invokeMethod('openInstallPermissionSettings');
+    } catch (_) {}
+  }
+
+  Future<bool> hasNotificationPermission() async {
+    try {
+      return await _appChannel.invokeMethod<bool>('hasNotificationPermission') ?? true;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  Future<void> requestNotificationPermission() async {
+    try {
+      await _appChannel.invokeMethod('requestNotificationPermission');
+    } catch (_) {}
+  }
+
+  Future<bool> getAutoCheckUpdates() async {
+    try {
+      return await _appChannel.invokeMethod<bool>('getAutoCheckUpdates') ?? true;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  Future<void> setAutoCheckUpdates(bool enabled) async {
+    try {
+      await _appChannel.invokeMethod('setAutoCheckUpdates', {'enabled': enabled});
     } catch (_) {}
   }
 }

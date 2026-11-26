@@ -21,16 +21,26 @@ class MainActivity : FlutterActivity() {
     private var appChannel: MethodChannel? = null
     private var pendingTargetRoute: String? = null
     private var soundEngine: KeySoundEngine? = null
+    private var otaManager: OtaUpdateManager? = null
 
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
         soundEngine = KeySoundEngine(this).apply { init() }
+        otaManager = OtaUpdateManager(this).apply {
+            cleanupAfterInstallIfNeeded()
+            checkIfDueBackground(minIntervalMs = 15 * 60 * 1000L)
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             window.attributes = window.attributes.apply {
                 preferredRefreshRate = 60.0f
             }
         }
         handleIntentExtras(intent)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        otaManager?.cleanupAfterInstallIfNeeded()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -139,6 +149,64 @@ class MainActivity : FlutterActivity() {
                     val style = call.argument<String>("style") ?: "soft"
                     val volume = (call.argument<Double>("volume") ?: 0.7).toFloat()
                     soundEngine?.play(style, volume, effect)
+                    result.success(true)
+                }
+                "getAppVersion" -> {
+                    result.success(otaManager?.getInstalledVersionName() ?: "1.0.0")
+                }
+                "checkForUpdate" -> {
+                    val notify = call.argument<Boolean>("notify") ?: false
+                    otaManager?.checkForUpdate(notifyIfNew = notify) { data ->
+                        result.success(data)
+                    }
+                }
+                "downloadAndInstallUpdate" -> {
+                    val url = call.argument<String>("url") ?: ""
+                    val tag = call.argument<String>("tag") ?: ""
+                    otaManager?.downloadAndInstall(
+                        apkUrl = url,
+                        versionTag = tag,
+                        onProgress = { pct, downloaded, total ->
+                            appChannel?.invokeMethod("onOtaProgress", hashMapOf(
+                                "percent" to pct,
+                                "downloaded" to downloaded,
+                                "total" to total
+                            ))
+                        },
+                        onFinished = { status, msg ->
+                            appChannel?.invokeMethod("onOtaComplete", hashMapOf(
+                                "status" to status,
+                                "message" to msg
+                            ))
+                        }
+                    )
+                    result.success(true)
+                }
+                "canRequestPackageInstalls" -> {
+                    result.success(otaManager?.canRequestPackageInstalls() ?: true)
+                }
+                "openInstallPermissionSettings" -> {
+                    otaManager?.openInstallPermissionSettings()
+                    result.success(true)
+                }
+                "hasNotificationPermission" -> {
+                    val granted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+                    } else true
+                    result.success(granted)
+                }
+                "requestNotificationPermission" -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1003)
+                    }
+                    result.success(true)
+                }
+                "getAutoCheckUpdates" -> {
+                    result.success(otaManager?.isAutoCheckEnabled() ?: true)
+                }
+                "setAutoCheckUpdates" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: true
+                    otaManager?.setAutoCheckEnabled(enabled)
                     result.success(true)
                 }
                 else -> result.notImplemented()

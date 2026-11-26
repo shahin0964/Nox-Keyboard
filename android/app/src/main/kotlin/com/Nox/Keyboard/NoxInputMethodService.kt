@@ -53,6 +53,7 @@ class NoxInputMethodService : InputMethodService() {
     private var speechRecognizer: SpeechRecognizer? = null
     private var currentEditorInfo: EditorInfo? = null
     private var soundEngine: KeySoundEngine? = null
+    private var otaManager: OtaUpdateManager? = null
     private val mainHandler = Handler(Looper.getMainLooper())
 
     companion object {
@@ -108,6 +109,7 @@ class NoxInputMethodService : InputMethodService() {
     override fun onCreate() {
         super.onCreate()
         soundEngine = KeySoundEngine(this).apply { init() }
+        otaManager = OtaUpdateManager(this).apply { cleanupAfterInstallIfNeeded() }
         initFlutterEngine()
     }
 
@@ -458,6 +460,7 @@ class NoxInputMethodService : InputMethodService() {
         )
 
         channel?.invokeMethod("onStartInput", data)
+        otaManager?.checkIfDueBackground()
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {

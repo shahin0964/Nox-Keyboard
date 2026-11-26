@@ -73,6 +73,49 @@ class AboutScreen extends StatelessWidget {
               ],
             ),
           ),
+          const SizedBox(height: 16),
+          GlassCard(
+            onTap: () => Navigator.pushNamed(context, '/updates'),
+            padding: const EdgeInsets.all(16),
+            borderColor: const Color(0xFF00E5FF).withValues(alpha: 0.35),
+            child: Row(
+              children: [
+                const ModernIconBadge(
+                  icon: CupertinoIcons.arrow_down_circle_fill,
+                  color: Color(0xFF00E5FF),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Check for App Updates',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14.5,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Download & install latest Nox Keyboard OTA update',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.white.withValues(alpha: 0.6),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(
+                  CupertinoIcons.chevron_right,
+                  color: Color(0xFF00E5FF),
+                  size: 18,
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
