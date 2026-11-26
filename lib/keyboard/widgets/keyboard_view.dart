@@ -38,6 +38,9 @@ class _NoxFirebaseViewState extends State<NoxKeyboardView>
   final GlobalKey _gridBoxKey = GlobalKey();
 
   double _lastSyncedContentHeight = -1;
+  int _lastGridRevision = -1;
+  KeyboardPanel _lastPanel = KeyboardPanel.none;
+  String _lastOneHandedMode = 'none';
   late AnimationController _themeAnimController;
   late AnimationController _rippleAnimController;
   Offset? _lastRippleOrigin;
@@ -49,6 +52,9 @@ class _NoxFirebaseViewState extends State<NoxKeyboardView>
   @override
   void initState() {
     super.initState();
+    _lastGridRevision = _engine.gridRevision;
+    _lastPanel = _engine.activePanel;
+    _lastOneHandedMode = _engine.oneHandedMode;
     _themeAnimController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 3000),
@@ -121,7 +127,16 @@ class _NoxFirebaseViewState extends State<NoxKeyboardView>
 
   void _onEngineUpdate() {
     _syncNativeDimensions();
-    if (mounted) setState(() {});
+    final needsLayoutRebuild =
+        _lastGridRevision != _engine.gridRevision ||
+        _lastPanel != _engine.activePanel ||
+        _lastOneHandedMode != _engine.oneHandedMode;
+    if (needsLayoutRebuild && mounted) {
+      _lastGridRevision = _engine.gridRevision;
+      _lastPanel = _engine.activePanel;
+      _lastOneHandedMode = _engine.oneHandedMode;
+      setState(() {});
+    }
   }
 
   void _onThemeUpdate() {
@@ -164,7 +179,10 @@ class _NoxFirebaseViewState extends State<NoxKeyboardView>
     Widget keyboardBody = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        ToolbarWidget(engine: _engine, theme: theme),
+        AnimatedBuilder(
+          animation: _engine,
+          builder: (_, __) => ToolbarWidget(engine: _engine, theme: theme),
+        ),
         SizedBox(
           height: keyAreaHeight,
           child: mainContent,

@@ -44,8 +44,8 @@ class LanguageModel {
 
   static const LanguageModel bangla = LanguageModel(
     code: 'bn_BD',
-    name: 'Bangla (National / Probhat)',
-    nativeName: 'বাংলা (প্রভাত)',
+    name: 'Bangla (Standard)',
+    nativeName: 'বাংলা',
     flag: '🇧🇩',
     isRtl: false,
     hasPhonetic: false,

@@ -325,6 +325,21 @@ class NoxInputMethodService : InputMethodService() {
                     performHaptic(durationMs)
                     result.success(true)
                 }
+                "triggerKeyFeedback" -> {
+                    val playSound = call.argument<Boolean>("playSound") ?: false
+                    if (playSound) {
+                        val effect = call.argument<Int>("effect") ?: 0
+                        val style = call.argument<String>("style") ?: "soft"
+                        val volume = (call.argument<Double>("volume") ?: 0.7).toFloat()
+                        soundEngine?.play(style, volume, effect)
+                    }
+                    val doVibrate = call.argument<Boolean>("vibrate") ?: false
+                    if (doVibrate) {
+                        val durationMs = (call.argument<Int>("duration") ?: 15).toLong()
+                        performHaptic(durationMs)
+                    }
+                    result.success(true)
+                }
                 "getTextBeforeCursor" -> {
                     val length = call.argument<Int>("length") ?: 100
                     val text = ic?.getTextBeforeCursor(length, 0)?.toString() ?: ""
@@ -351,11 +366,6 @@ class NoxInputMethodService : InputMethodService() {
         win.addFlags(WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED)
         win.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
         win.setGravity(Gravity.BOTTOM)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            win.attributes = win.attributes.apply {
-                preferredRefreshRate = 60.0f
-            }
-        }
     }
 
     override fun onEvaluateFullscreenMode(): Boolean {

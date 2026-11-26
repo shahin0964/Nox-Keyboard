@@ -102,13 +102,13 @@ class SymbolsLayout {
           KeyboardKey(primary: 'BACKSPACE', action: KeyAction.backspace, flex: 14),
         ]),
 
-        // Row 4
+        // Row 4: Keep 🌐 locked in exact same position across symbols pages
         KeyboardRow(keys: [
           KeyboardKey(primary: 'ABC', action: KeyAction.switchLetters, flex: 14),
-          KeyboardKey(primary: '<', flex: 10),
-          KeyboardKey(primary: '>', flex: 10),
+          KeyboardKey(primary: '🌐', action: KeyAction.switchLanguage, flex: 10),
+          KeyboardKey(primary: '<', alternateChars: ['<', '«'], flex: 10),
           KeyboardKey(primary: 'SPACE', action: KeyAction.space, flex: 44),
-          KeyboardKey(primary: '…', flex: 10),
+          KeyboardKey(primary: '>', secondary: '…', alternateChars: ['>', '»', '…'], flex: 10),
           KeyboardKey(primary: 'ENTER', action: KeyAction.enter, flex: 16),
         ]),
       ],

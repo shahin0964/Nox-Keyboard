@@ -27,7 +27,16 @@ class HapticSoundService {
   }
 
   void onKeyFeedback([int effect = 0]) {
-    playKeyClick(effect);
-    performHaptic();
+    final playSound = _prefs.soundOnKeypress;
+    final vibrate = _prefs.vibrateOnKeypress;
+    if (!playSound && !vibrate) return;
+    _bridge.triggerKeyFeedback(
+      playSound: playSound,
+      effect: effect,
+      style: _prefs.soundStyle,
+      volume: _prefs.soundVolume,
+      vibrate: vibrate,
+      durationMs: _prefs.vibrationIntensity,
+    );
   }
 }

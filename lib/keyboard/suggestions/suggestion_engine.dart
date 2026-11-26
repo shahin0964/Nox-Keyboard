@@ -54,7 +54,7 @@ class SuggestionEngine {
         }
       }
 
-      if (languageCode == 'bn_avro' || (languageCode == 'bn_BD' && isBanglaPhonetic)) {
+      if (languageCode == 'bn_avro') {
         // Bangla Avro Phonetic Suggestions
         final phoneticMatches = _banglaPhonetic.getPhoneticSuggestions(composingWord, limit: 3);
         for (int i = 0; i < phoneticMatches.length; i++) {
@@ -72,7 +72,7 @@ class SuggestionEngine {
         // Direct language suggestions
         final prefixMatches = _dictionaryService.searchPrefix(composingWord, languageCode, limit: 3);
         String? correction;
-        if (autocorrectEnabled && candidates.isEmpty) {
+        if (autocorrectEnabled && candidates.isEmpty && languageCode.startsWith('en')) {
           correction = _autocorrectService.findCorrection(composingWord, languageCode);
         }
 

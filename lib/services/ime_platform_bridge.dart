@@ -292,6 +292,35 @@ class ImePlatformBridge {
     }
   }
 
+  Future<void> triggerKeyFeedback({
+    required bool playSound,
+    required int effect,
+    required String style,
+    required double volume,
+    required bool vibrate,
+    required int durationMs,
+  }) async {
+    if (!playSound && !vibrate) return;
+    if (_isMockMode) {
+      if (playSound) playKeySound(effect, style, volume);
+      if (vibrate) HapticFeedback.lightImpact();
+      return;
+    }
+    try {
+      await _imeChannel.invokeMethod('triggerKeyFeedback', {
+        'playSound': playSound,
+        'effect': effect,
+        'style': style,
+        'volume': volume,
+        'vibrate': vibrate,
+        'duration': durationMs,
+      });
+    } catch (_) {
+      if (playSound) playKeySound(effect, style, volume);
+      if (vibrate) HapticFeedback.lightImpact();
+    }
+  }
+
   Future<String> getTextBeforeCursor([int length = 100]) async {
     if (_isMockMode) return '';
     try {

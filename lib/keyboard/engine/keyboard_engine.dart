@@ -83,6 +83,13 @@ class KeyboardEngine extends ChangeNotifier {
   bool _forceShowToolbar = false;
   bool get forceShowToolbar => _forceShowToolbar;
 
+  int _gridRevision = 0;
+  int get gridRevision => _gridRevision;
+
+  static final RegExp _wordCharRegex = RegExp(
+    r'[a-zA-Z\u0981-\u09DF\u0900-\u0963\u0966-\u097F\u0621-\u065F\u0670-\u06D3]',
+  );
+
   List<String> _toolbarOrder = List<String>.from(PreferencesHelper.defaultToolbarOrder);
   List<String> get toolbarOrder => _toolbarOrder;
 
@@ -95,6 +102,7 @@ class KeyboardEngine extends ChangeNotifier {
     list.insert(toIndex, item);
     _toolbarOrder = list;
     _prefs.setToolbarOrder(list);
+    _gridRevision++;
     notifyListeners();
   }
 
@@ -111,11 +119,12 @@ class KeyboardEngine extends ChangeNotifier {
       _oneHandedMode = _prefs.oneHandedMode;
       _isFloating = _prefs.isFloatingMode;
       _toolbarOrder = _prefs.toolbarOrder;
-      _toolbarOrder = _prefs.toolbarOrder;
+      _gridRevision++;
       notifyListeners();
     });
 
     _langManager.addListener(() {
+      _gridRevision++;
       _updateSuggestions();
       notifyListeners();
     });
@@ -145,6 +154,7 @@ class KeyboardEngine extends ChangeNotifier {
       _contextBefore = data['textBeforeCursor'] as String? ?? '';
       _composingWord = '';
       _forceShowToolbar = false;
+      _gridRevision++;
       _updateSuggestions();
       notifyListeners();
     };
@@ -154,6 +164,7 @@ class KeyboardEngine extends ChangeNotifier {
       _candidates.clear();
       _activePanel = KeyboardPanel.none;
       _forceShowToolbar = false;
+      _gridRevision++;
       notifyListeners();
     };
   }
@@ -216,7 +227,7 @@ class KeyboardEngine extends ChangeNotifier {
 
   KeyboardRow? get numberRow {
     if (_showNumberRow && _mode == KeyboardMode.letters) {
-      return NumberRowLayout.getRow();
+      return NumberRowLayout.getRow(languageCode: _langManager.currentLanguage.code);
     }
     return null;
   }
@@ -224,6 +235,7 @@ class KeyboardEngine extends ChangeNotifier {
   void toggleNumberRow() {
     _showNumberRow = !_showNumberRow;
     _prefs.setShowNumberRow(_showNumberRow);
+    _gridRevision++;
     notifyListeners();
   }
 
@@ -235,27 +247,35 @@ class KeyboardEngine extends ChangeNotifier {
   void setOneHandedMode(String mode) {
     _oneHandedMode = mode;
     _prefs.setOneHandedMode(mode);
+    _gridRevision++;
     notifyListeners();
   }
 
   void toggleFloatingMode() {
     _isFloating = !_isFloating;
     _prefs.setIsFloatingMode(_isFloating);
+    _gridRevision++;
     notifyListeners();
   }
 
   void openPanel(KeyboardPanel panel) {
     _activePanel = (_activePanel == panel) ? KeyboardPanel.none : panel;
+    _gridRevision++;
     notifyListeners();
   }
 
   void closePanel() {
     _activePanel = KeyboardPanel.none;
+    _gridRevision++;
     notifyListeners();
   }
 
-  void onKeyPress(KeyboardKey key) {
-    _hapticSound.onKeyFeedback(key.action == KeyAction.space || key.action == KeyAction.backspace || key.action == KeyAction.enter ? 1 : 0);
+  void onKeyPress(KeyboardKey key, {bool skipFeedback = false}) {
+    if (!skipFeedback) {
+      _hapticSound.onKeyFeedback(
+        key.action == KeyAction.space || key.action == KeyAction.backspace || key.action == KeyAction.enter ? 1 : 0,
+      );
+    }
 
     switch (key.action) {
       case KeyAction.character:
@@ -279,14 +299,17 @@ class KeyboardEngine extends ChangeNotifier {
           _composingWord = '';
         }
         _mode = KeyboardMode.symbols;
+        _gridRevision++;
         notifyListeners();
         break;
       case KeyAction.switchMoreSymbols:
         _mode = KeyboardMode.moreSymbols;
+        _gridRevision++;
         notifyListeners();
         break;
       case KeyAction.switchLetters:
         _mode = KeyboardMode.letters;
+        _gridRevision++;
         notifyListeners();
         break;
       case KeyAction.switchLanguage:
@@ -346,7 +369,7 @@ class KeyboardEngine extends ChangeNotifier {
       // Commit text first for instant zero-lag appearance in active field
       _bridge.commitText(char);
       _contextBefore += char;
-      final isLetter = RegExp(r'[a-zA-Z]').hasMatch(char);
+      final isLetter = _wordCharRegex.hasMatch(char);
       if (isLetter && _mode == KeyboardMode.letters) {
         _composingWord += char;
       } else {
@@ -361,6 +384,7 @@ class KeyboardEngine extends ChangeNotifier {
     // Auto unshift after single shift tap
     if (_isShifted && !_isCapsLock) {
       _isShifted = false;
+      _gridRevision++;
     }
     notifyListeners();
   }
@@ -377,6 +401,7 @@ class KeyboardEngine extends ChangeNotifier {
       _isShifted = !_isShifted;
       _lastShiftTapTime = now;
     }
+    _gridRevision++;
     notifyListeners();
   }
 
@@ -446,8 +471,11 @@ class KeyboardEngine extends ChangeNotifier {
       return;
     }
 
-    // 2. Autocorrect on Space in standard typing
-    if (_prefs.autoCorrection && _composingWord.isNotEmpty && _candidates.isNotEmpty) {
+    // 2. Autocorrect on Space in English typing only (never overwrite Bangla/Indic/Arabic script words)
+    if (_langManager.currentLanguage.code.startsWith('en') &&
+        _prefs.autoCorrection &&
+        _composingWord.isNotEmpty &&
+        _candidates.isNotEmpty) {
       final center = _candidates.firstWhere((c) => c.isAutocorrect, orElse: () => _candidates.first);
       if (center.text != _composingWord) {
         // Replace composing word with autocorrected word
@@ -545,7 +573,7 @@ class KeyboardEngine extends ChangeNotifier {
       composingWord: _composingWord,
       contextBefore: _contextBefore,
       languageCode: _langManager.currentLanguage.code,
-      isBanglaPhonetic: _langManager.isBanglaPhonetic,
+      isBanglaPhonetic: _isAvroActive,
       autocorrectEnabled: _prefs.autoCorrection,
       nextWordEnabled: _prefs.nextWordPrediction,
     );

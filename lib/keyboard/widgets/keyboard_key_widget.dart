@@ -6,8 +6,9 @@ import '../../themes/theme_model.dart';
 import '../../data/preferences_helper.dart';
 import '../../languages/language_manager.dart';
 import '../../services/ime_platform_bridge.dart';
-import '../layouts/keyboard_layout.dart';
+import 'keyboard_layout.dart';
 import '../engine/keyboard_engine.dart';
+import '../engine/haptic_sound_service.dart';
 import 'key_preview_popup.dart';
 import 'long_press_dialog.dart';
 
@@ -45,6 +46,13 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
   Offset _pointerDownPosition = Offset.zero;
   bool _hasTriggeredLongPress = false;
   bool _hasDraggedSpace = false;
+  double _screenWidth = 360.0;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _screenWidth = MediaQuery.sizeOf(context).width;
+  }
 
   @override
   void dispose() {
@@ -79,9 +87,8 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
     final offset = renderBox.localToGlobal(Offset.zero);
     final size = renderBox.size;
     final char = _getEffectiveChar();
-    final screenWidth = MediaQuery.of(context).size.width;
     final popupWidth = size.width + 4;
-    final clampedLeft = (offset.dx - 2).clamp(2.0, (screenWidth - popupWidth - 2.0).clamp(2.0, screenWidth));
+    final clampedLeft = (offset.dx - 2).clamp(2.0, (_screenWidth - popupWidth - 2.0).clamp(2.0, _screenWidth));
     final clampedTop = (offset.dy - 44).clamp(2.0, double.infinity);
 
     _previewDismissTimer?.cancel();
@@ -106,8 +113,7 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
 
   void _schedulePreviewDismiss() {
     _previewDismissTimer?.cancel();
-    // Keep the Gboard preview bubble visible for 130ms so it floats up and fades visibly
-    _previewDismissTimer = Timer(const Duration(milliseconds: 130), () {
+    _previewDismissTimer = Timer(const Duration(milliseconds: 55), () {
       _previewEntry?.remove();
       _previewEntry = null;
     });
@@ -133,10 +139,9 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
     _alternatesEntry = OverlayEntry(
       builder: (context) {
         final popupWidth = alternates.length * 40.0 + 16.0;
-        final screenWidth = MediaQuery.of(context).size.width;
         double left = offset.dx + (size.width - popupWidth) / 2;
         if (left < 10) left = 10;
-        if (left + popupWidth > screenWidth - 10) left = screenWidth - popupWidth - 10;
+        if (left + popupWidth > _screenWidth - 10) left = _screenWidth - popupWidth - 10;
 
         return Positioned(
           left: left,
@@ -162,22 +167,25 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
     _pointerDownPosition = event.position;
     _hasTriggeredLongPress = false;
     _hasDraggedSpace = false;
-    setState(() => _isPressed = true);
+    if (!_isPressed) setState(() => _isPressed = true);
     widget.onTapOrigin?.call(event.position);
 
     final k = widget.keyboardKey;
+    final feedbackEffect = (k.action == KeyAction.space || k.action == KeyAction.backspace || k.action == KeyAction.enter) ? 1 : 0;
+    // Instant 0ms haptic + sound on touch down before finger even lifts
+    HapticSoundService().onKeyFeedback(feedbackEffect);
 
     if (k.action == KeyAction.character) {
       _showPreviewPopup();
       if (k.alternateChars.isNotEmpty) {
-        _longPressTimer = Timer(const Duration(milliseconds: 350), () {
+        _longPressTimer = Timer(const Duration(milliseconds: 340), () {
           _showAlternatesPopup();
         });
       }
     } else if (k.action == KeyAction.backspace) {
-      widget.engine.onKeyPress(k);
-      _longPressTimer = Timer(const Duration(milliseconds: 380), () {
-        _repeatTimer = Timer.periodic(const Duration(milliseconds: 55), (_) {
+      widget.engine.onKeyPress(k, skipFeedback: true);
+      _longPressTimer = Timer(const Duration(milliseconds: 360), () {
+        _repeatTimer = Timer.periodic(const Duration(milliseconds: 50), (_) {
           widget.engine.onKeyPress(k);
         });
       });
@@ -189,7 +197,7 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
         LanguageManager().cycleNextLanguage();
       });
     } else {
-      widget.engine.onKeyPress(k);
+      widget.engine.onKeyPress(k, skipFeedback: true);
     }
   }
 
@@ -237,11 +245,11 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
     if (k.action == KeyAction.character) {
       if (!_hasTriggeredLongPress) {
         final charToCommit = _getEffectiveChar();
-        widget.engine.onKeyPress(k.copyWith(primary: charToCommit));
+        widget.engine.onKeyPress(k.copyWith(primary: charToCommit), skipFeedback: true);
       }
     } else if (k.action == KeyAction.space) {
       if (!_hasDraggedSpace && !_hasTriggeredLongPress) {
-        widget.engine.onKeyPress(k);
+        widget.engine.onKeyPress(k, skipFeedback: true);
       }
       widget.engine.onSpaceDragEnd(DragEndDetails());
     }
@@ -258,11 +266,11 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
       final distance = (event.position - _pointerDownPosition).distance;
       if (distance < 42 && !_hasTriggeredLongPress) {
         final charToCommit = _getEffectiveChar();
-        widget.engine.onKeyPress(k.copyWith(primary: charToCommit));
+        widget.engine.onKeyPress(k.copyWith(primary: charToCommit), skipFeedback: true);
       }
     } else if (k.action == KeyAction.space) {
       if (!_hasDraggedSpace && !_hasTriggeredLongPress) {
-        widget.engine.onKeyPress(k);
+        widget.engine.onKeyPress(k, skipFeedback: true);
       }
       widget.engine.onSpaceDragEnd(DragEndDetails());
     }
@@ -519,9 +527,7 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
 
     if (k.action == KeyAction.space) {
       final lang = LanguageManager().currentLanguage;
-      final label = lang.code == 'bn_BD'
-          ? (LanguageManager().isBanglaPhonetic ? 'বাংলা (অভ্র)' : 'বাংলা')
-          : lang.nativeName;
+      final label = lang.nativeName;
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
