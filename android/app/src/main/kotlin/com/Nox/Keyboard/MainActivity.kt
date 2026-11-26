@@ -20,9 +20,11 @@ class MainActivity : FlutterActivity() {
     private val APP_CHANNEL = "com.nox.keyboard/app"
     private var appChannel: MethodChannel? = null
     private var pendingTargetRoute: String? = null
+    private var soundEngine: KeySoundEngine? = null
 
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
+        soundEngine = KeySoundEngine(this).apply { init() }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             window.attributes = window.attributes.apply {
                 preferredRefreshRate = 60.0f
@@ -132,9 +134,22 @@ class MainActivity : FlutterActivity() {
                     performHaptic(durationMs)
                     result.success(true)
                 }
+                "playKeySound" -> {
+                    val effect = call.argument<Int>("effect") ?: 0
+                    val style = call.argument<String>("style") ?: "soft"
+                    val volume = (call.argument<Double>("volume") ?: 0.7).toFloat()
+                    soundEngine?.play(style, volume, effect)
+                    result.success(true)
+                }
                 else -> result.notImplemented()
             }
         }
+    }
+
+    override fun onDestroy() {
+        soundEngine?.release()
+        soundEngine = null
+        super.onDestroy()
     }
 
     private fun performHaptic(durationMs: Long) {

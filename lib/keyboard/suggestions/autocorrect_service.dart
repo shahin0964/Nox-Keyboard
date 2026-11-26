@@ -46,21 +46,31 @@ class AutocorrectService {
   }
 
   String? findCorrection(String input, String languageCode) {
-    if (input.length < 2) return null;
+    if (input.length < 3) return null;
     final lower = input.toLowerCase();
 
-    // Check common typos
+    // Check common typos (O(1) instant lookup)
     if (_commonEnglishTypos.containsKey(lower)) {
       return _matchCase(input, _commonEnglishTypos[lower]!);
     }
 
-    // Levenshtein distance against known vocabulary
+    // Fast exit if exact word already exists
     final words = DictionaryService().getWordsForLanguage(languageCode);
+    for (final word in words) {
+      if (word.length == lower.length && word.toLowerCase() == lower) {
+        return null;
+      }
+    }
+
+    // Bounded Levenshtein check (capped for zero typing lag)
     String? bestMatch;
     int minDistance = 999;
+    int scanned = 0;
 
     for (final word in words) {
-      if ((word.length - input.length).abs() > 2) continue;
+      if ((word.length - input.length).abs() > 1) continue;
+      if (word.isEmpty || word[0].toLowerCase() != lower[0]) continue;
+      if (++scanned > 80) break;
       final dist = _levenshtein(lower, word.toLowerCase());
       if (dist <= 2 && dist < minDistance) {
         minDistance = dist;

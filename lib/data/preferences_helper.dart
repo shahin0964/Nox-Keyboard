@@ -9,14 +9,46 @@ class PreferencesHelper {
 
   SharedPreferences? _prefs;
 
+  // In-memory caches to guarantee <0.1ms zero-lag lookup on every keystroke
+  Map<String, String>? _shortcutsCache;
+  Map<String, int>? _learnedFreqCache;
+  Map<String, List<String>>? _learnedBigramsCache;
+  List<String>? _userDictCache;
+  List<String>? _toolbarOrderCache;
+
+  void _invalidateCaches() {
+    _shortcutsCache = null;
+    _learnedFreqCache = null;
+    _learnedBigramsCache = null;
+    _userDictCache = null;
+    _toolbarOrderCache = null;
+  }
+
   Future<void> init() async {
     _prefs ??= await SharedPreferences.getInstance();
     await _seedDefaultDictionaryIfNeeded();
+    await _ensureBanglaAvroEnabled();
   }
 
   Future<void> reload() async {
     await init();
     await _prefs?.reload();
+    _invalidateCaches();
+  }
+
+  Future<void> _ensureBanglaAvroEnabled() async {
+    if (_prefs == null) return;
+    final current = _prefs!.getStringList(AppConstants.keyEnabledLanguages);
+    if (current != null && !current.contains('bn_avro')) {
+      final updated = List<String>.from(current);
+      final bnIdx = updated.indexOf('bn_BD');
+      if (bnIdx != -1) {
+        updated.insert(bnIdx, 'bn_avro');
+      } else {
+        updated.insert(0, 'bn_avro');
+      }
+      await _prefs!.setStringList(AppConstants.keyEnabledLanguages, updated);
+    }
   }
 
   Future<void> _seedDefaultDictionaryIfNeeded() async {
@@ -75,6 +107,12 @@ class PreferencesHelper {
 
   bool get soundOnKeypress => _prefs?.getBool(AppConstants.keySoundOnKeypress) ?? true;
   Future<bool> setSoundOnKeypress(bool val) async => await _prefs?.setBool(AppConstants.keySoundOnKeypress, val) ?? false;
+
+  String get soundStyle => _prefs?.getString(AppConstants.keySoundStyle) ?? 'soft';
+  Future<bool> setSoundStyle(String style) async => await _prefs?.setString(AppConstants.keySoundStyle, style) ?? false;
+
+  double get soundVolume => _prefs?.getDouble(AppConstants.keySoundVolume) ?? 0.7;
+  Future<bool> setSoundVolume(double val) async => await _prefs?.setDouble(AppConstants.keySoundVolume, val) ?? false;
 
   bool get vibrateOnKeypress => _prefs?.getBool(AppConstants.keyVibrateOnKeypress) ?? true;
   Future<bool> setVibrateOnKeypress(bool val) async => await _prefs?.setBool(AppConstants.keyVibrateOnKeypress, val) ?? false;
@@ -163,14 +201,20 @@ class PreferencesHelper {
     await _prefs?.setStringList(AppConstants.keyRecentEmojis, list);
   }
 
-  // User Dictionary
-  List<String> get userDictionary => _prefs?.getStringList(AppConstants.keyUserDictionary) ?? [];
+  // User Dictionary (cached in RAM)
+  List<String> get userDictionary {
+    if (_userDictCache != null) return _userDictCache!;
+    _userDictCache = _prefs?.getStringList(AppConstants.keyUserDictionary) ?? [];
+    return _userDictCache!;
+  }
+
   Future<void> addUserWord(String word) async {
     final clean = word.trim().toLowerCase();
     if (clean.isEmpty) return;
     final list = List<String>.from(userDictionary);
     if (!list.contains(clean)) {
       list.add(clean);
+      _userDictCache = list;
       await _prefs?.setStringList(AppConstants.keyUserDictionary, list);
     }
   }
@@ -178,22 +222,30 @@ class PreferencesHelper {
   Future<void> removeUserWord(String word) async {
     final list = List<String>.from(userDictionary);
     list.remove(word.trim().toLowerCase());
+    _userDictCache = list;
     await _prefs?.setStringList(AppConstants.keyUserDictionary, list);
   }
 
   Future<void> clearUserDictionary() async {
+    _userDictCache = [];
     await _prefs?.setStringList(AppConstants.keyUserDictionary, []);
   }
 
-  // Custom Text Shortcuts JSON map (shortcut -> expansion)
+  // Custom Text Shortcuts JSON map (cached in RAM)
   Map<String, String> get customShortcuts {
+    if (_shortcutsCache != null) return _shortcutsCache!;
     final raw = _prefs?.getString(AppConstants.keyCustomShortcuts);
-    if (raw == null || raw.isEmpty) return {};
+    if (raw == null || raw.isEmpty) {
+      _shortcutsCache = {};
+      return _shortcutsCache!;
+    }
     try {
       final decoded = jsonDecode(raw) as Map<String, dynamic>;
-      return decoded.map((k, v) => MapEntry(k, v.toString()));
+      _shortcutsCache = decoded.map((k, v) => MapEntry(k, v.toString()));
+      return _shortcutsCache!;
     } catch (_) {
-      return {};
+      _shortcutsCache = {};
+      return _shortcutsCache!;
     }
   }
 
@@ -203,28 +255,37 @@ class PreferencesHelper {
     if (cleanKey.isEmpty || cleanVal.isEmpty) return;
     final map = Map<String, String>.from(customShortcuts);
     map[cleanKey] = cleanVal;
+    _shortcutsCache = map;
     await _prefs?.setString(AppConstants.keyCustomShortcuts, jsonEncode(map));
   }
 
   Future<void> removeCustomShortcut(String shortcut) async {
     final map = Map<String, String>.from(customShortcuts);
     map.remove(shortcut.trim().toLowerCase());
+    _shortcutsCache = map;
     await _prefs?.setString(AppConstants.keyCustomShortcuts, jsonEncode(map));
   }
 
   Future<void> clearCustomShortcuts() async {
+    _shortcutsCache = {};
     await _prefs?.setString(AppConstants.keyCustomShortcuts, jsonEncode({}));
   }
 
-  // Auto-Learned Typing Vocabulary (word -> frequency)
+  // Auto-Learned Typing Vocabulary (cached in RAM)
   Map<String, int> get learnedWordFreq {
+    if (_learnedFreqCache != null) return _learnedFreqCache!;
     final raw = _prefs?.getString(AppConstants.keyLearnedWordFreq);
-    if (raw == null || raw.isEmpty) return {};
+    if (raw == null || raw.isEmpty) {
+      _learnedFreqCache = {};
+      return _learnedFreqCache!;
+    }
     try {
       final decoded = jsonDecode(raw) as Map<String, dynamic>;
-      return decoded.map((k, v) => MapEntry(k, (v as num).toInt()));
+      _learnedFreqCache = decoded.map((k, v) => MapEntry(k, (v as num).toInt()));
+      return _learnedFreqCache!;
     } catch (_) {
-      return {};
+      _learnedFreqCache = {};
+      return _learnedFreqCache!;
     }
   }
 
@@ -240,6 +301,7 @@ class PreferencesHelper {
         ..clear()
         ..addEntries(sorted.take(350));
     }
+    _learnedFreqCache = map;
     await _prefs?.setString(AppConstants.keyLearnedWordFreq, jsonEncode(map));
   }
 
@@ -254,19 +316,27 @@ class PreferencesHelper {
   }
 
   Future<void> clearLearnedData() async {
+    _learnedFreqCache = {};
+    _learnedBigramsCache = {};
     await _prefs?.setString(AppConstants.keyLearnedWordFreq, jsonEncode({}));
     await _prefs?.setString(AppConstants.keyLearnedBigrams, jsonEncode({}));
   }
 
-  // Auto-Learned Next-Word Followups (prevWord -> [nextWords])
+  // Auto-Learned Next-Word Followups (cached in RAM)
   Map<String, List<String>> get learnedBigrams {
+    if (_learnedBigramsCache != null) return _learnedBigramsCache!;
     final raw = _prefs?.getString(AppConstants.keyLearnedBigrams);
-    if (raw == null || raw.isEmpty) return {};
+    if (raw == null || raw.isEmpty) {
+      _learnedBigramsCache = {};
+      return _learnedBigramsCache!;
+    }
     try {
       final decoded = jsonDecode(raw) as Map<String, dynamic>;
-      return decoded.map((k, v) => MapEntry(k, List<String>.from(v as List)));
+      _learnedBigramsCache = decoded.map((k, v) => MapEntry(k, List<String>.from(v as List)));
+      return _learnedBigramsCache!;
     } catch (_) {
-      return {};
+      _learnedBigramsCache = {};
+      return _learnedBigramsCache!;
     }
   }
 
@@ -283,6 +353,7 @@ class PreferencesHelper {
     if (map.length > 250) {
       map.remove(map.keys.first);
     }
+    _learnedBigramsCache = map;
     await _prefs?.setString(AppConstants.keyLearnedBigrams, jsonEncode(map));
   }
 
@@ -351,6 +422,37 @@ class PreferencesHelper {
   Future<void> clearUnpinnedImageClips() async {
     final list = imageClips.where((e) => e['pinned'] as bool? ?? false).toList();
     await _prefs?.setString(AppConstants.keyImageClips, jsonEncode(list));
+  }
+
+  static const List<String> defaultToolbarOrder = [
+    'emoji',
+    'clipboard',
+    'textEditing',
+    'themes',
+    'oneHanded',
+    'numbers',
+    'settings',
+    'voice',
+  ];
+
+  List<String> get toolbarOrder {
+    if (_toolbarOrderCache != null) return _toolbarOrderCache!;
+    final saved = _prefs?.getStringList(AppConstants.keyToolbarOrder);
+    if (saved == null || saved.isEmpty) {
+      _toolbarOrderCache = List<String>.from(defaultToolbarOrder);
+      return _toolbarOrderCache!;
+    }
+    final merged = List<String>.from(saved);
+    for (final id in defaultToolbarOrder) {
+      if (!merged.contains(id)) merged.add(id);
+    }
+    _toolbarOrderCache = merged;
+    return _toolbarOrderCache!;
+  }
+
+  Future<bool> setToolbarOrder(List<String> order) async {
+    _toolbarOrderCache = List<String>.from(order);
+    return await _prefs?.setStringList(AppConstants.keyToolbarOrder, order) ?? false;
   }
 
   // Custom Themes JSON map

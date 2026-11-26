@@ -18,6 +18,7 @@ class KeyboardKeyWidget extends StatefulWidget {
   final double animValue;
   final int colIndex;
   final int rowIndex;
+  final ValueChanged<Offset>? onTapOrigin;
 
   const KeyboardKeyWidget({
     super.key,
@@ -27,6 +28,7 @@ class KeyboardKeyWidget extends StatefulWidget {
     this.animValue = 0.0,
     this.colIndex = 0,
     this.rowIndex = 0,
+    this.onTapOrigin,
   });
 
   @override
@@ -40,8 +42,6 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
   Timer? _longPressTimer;
   Timer? _repeatTimer;
   Timer? _previewDismissTimer;
-  Timer? _pressReleaseTimer;
-  DateTime? _pointerDownTime;
   Offset _pointerDownPosition = Offset.zero;
   bool _hasTriggeredLongPress = false;
   bool _hasDraggedSpace = false;
@@ -51,7 +51,6 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
     _longPressTimer?.cancel();
     _repeatTimer?.cancel();
     _previewDismissTimer?.cancel();
-    _pressReleaseTimer?.cancel();
     _removeOverlays();
     super.dispose();
   }
@@ -161,11 +160,10 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
 
   void _onPointerDown(PointerDownEvent event) {
     _pointerDownPosition = event.position;
-    _pointerDownTime = DateTime.now();
-    _pressReleaseTimer?.cancel();
     _hasTriggeredLongPress = false;
     _hasDraggedSpace = false;
     setState(() => _isPressed = true);
+    widget.onTapOrigin?.call(event.position);
 
     final k = widget.keyboardKey;
 
@@ -228,26 +226,11 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
     }
   }
 
-  void _releasePressState() {
-    _pressReleaseTimer?.cancel();
-    final elapsedMs = _pointerDownTime == null
-        ? 85
-        : DateTime.now().difference(_pointerDownTime!).inMilliseconds;
-    final remaining = 85 - elapsedMs;
-    if (remaining <= 0) {
-      if (mounted) setState(() => _isPressed = false);
-    } else {
-      _pressReleaseTimer = Timer(Duration(milliseconds: remaining), () {
-        if (mounted) setState(() => _isPressed = false);
-      });
-    }
-  }
-
   void _onPointerUp(PointerUpEvent event) {
     _longPressTimer?.cancel();
     _repeatTimer?.cancel();
     _schedulePreviewDismiss();
-    _releasePressState();
+    if (_isPressed) setState(() => _isPressed = false);
 
     final k = widget.keyboardKey;
 
@@ -268,7 +251,7 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
     _longPressTimer?.cancel();
     _repeatTimer?.cancel();
     _schedulePreviewDismiss();
-    _releasePressState();
+    if (_isPressed) setState(() => _isPressed = false);
 
     final k = widget.keyboardKey;
     if (k.action == KeyAction.character) {
@@ -362,7 +345,17 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
     }
 
     Color bg;
-    if (isShiftActive) {
+    final bool isHeartKey = (shape == 'heart_center') && _isHeartCell(widget.rowIndex, widget.colIndex);
+
+    if (isHeartKey) {
+      final pulse = (math.sin(widget.animValue * 2 * math.pi) + 1) * 0.5;
+      bg = Color.lerp(
+            const Color(0xFF6B0B24),
+            const Color(0xFFFF1744),
+            _isPressed ? 0.95 : (0.52 + pulse * 0.28),
+          ) ??
+          const Color(0xFFD50032);
+    } else if (isShiftActive) {
       bg = dynamicAccent.withOpacity(0.35);
     } else if (isEnter) {
       bg = _isPressed
@@ -383,7 +376,10 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
 
     Color borderCol;
     double borderWidth;
-    if (isEnter) {
+    if (isHeartKey) {
+      borderCol = const Color(0xFFFF5277).withOpacity(_isPressed ? 1.0 : 0.85);
+      borderWidth = 1.25;
+    } else if (isEnter) {
       borderCol = dynamicAccent.withOpacity(0.8);
       borderWidth = 1.3;
     } else if (animType == 'rgb_wave' || animType == 'cyber_scan' || shape == 'neon_outline') {
@@ -405,11 +401,9 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
     final bool isMech3D = shape == 'mechanical_3d';
     final double pressDepthOffset = (isMech3D && _isPressed) ? 2.0 : 0.0;
 
-    // Key container with visible scale bounce animation on tap & theme-specific styling
-    Widget keyContainer = AnimatedScale(
-      scale: _isPressed ? 0.90 : 1.0,
-      duration: const Duration(milliseconds: 55),
-      curve: Curves.easeOutCubic,
+    // Fast, zero-jank Transform.scale instead of 35 heavy AnimatedScale + BoxShadow blurs
+    Widget keyContainer = Transform.scale(
+      scale: _isPressed ? 0.92 : 1.0,
       child: Container(
         margin: EdgeInsets.only(
           left: widget.theme.keyMarginH,
@@ -420,7 +414,7 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(borderRadius),
-          gradient: shape == 'neon_outline'
+          gradient: (shape == 'neon_outline' || shape == 'spider_web')
               ? null
               : LinearGradient(
                   begin: Alignment.topCenter,
@@ -429,9 +423,9 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
                     _isPressed
                         ? Colors.transparent
                         : Colors.white.withOpacity(
-                            shape == 'glass_frost'
-                                ? 0.16
-                                : (widget.theme.isDark ? 0.07 : 0.45),
+                            isHeartKey
+                                ? 0.28
+                                : (shape == 'glass_frost' ? 0.16 : (widget.theme.isDark ? 0.06 : 0.42)),
                           ),
                     Colors.transparent,
                   ],
@@ -452,15 +446,6 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
                   color: borderCol,
                   width: borderWidth,
                 ),
-          boxShadow: [
-            BoxShadow(
-              color: (animType == 'rgb_wave' || animType == 'cyber_scan' || isEnter)
-                  ? dynamicAccent.withOpacity(_isPressed ? 0.38 : (animType != 'none' ? 0.16 : 0.2))
-                  : Colors.black.withOpacity(widget.theme.isDark ? 0.32 : 0.09),
-              offset: const Offset(0, 1.5),
-              blurRadius: animType != 'none' ? 5.0 : 1.8,
-            ),
-          ],
         ),
         alignment: Alignment.center,
         child: content,
@@ -478,6 +463,13 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
         child: keyContainer,
       ),
     );
+  }
+
+  bool _isHeartCell(int row, int col) {
+    if (row == 0) return col == 3 || col == 4 || col == 6 || col == 7;
+    if (row == 1) return col >= 2 && col <= 6;
+    if (row == 2) return col >= 3 && col <= 5;
+    return false;
   }
 
   Widget _buildKeyContent(KeyboardKey k, bool isShiftActive) {

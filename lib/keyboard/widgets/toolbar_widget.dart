@@ -1,9 +1,9 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../../themes/theme_model.dart';
-import '../../services/ime_platform_bridge.dart';
 import '../engine/keyboard_engine.dart';
 import '../suggestions/suggestion_engine.dart';
+import 'toolbar_tools.dart';
 
 class ToolbarWidget extends StatelessWidget {
   final KeyboardEngine engine;
@@ -175,61 +175,25 @@ class ToolbarWidget extends StatelessWidget {
     );
   }
 
-  // Toolbar icons when not typing
+  // Toolbar icons when not typing — respects customizable order from ToolsGridPanel
   Widget _buildToolsRow(BuildContext context) {
+    final orderedIds = engine.toolbarOrder
+        .where((id) => id != 'voice' && KeyboardToolSpec.registry.containsKey(id))
+        .toList();
+
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       physics: const BouncingScrollPhysics(),
       child: Row(
-        children: [
-          _buildPillToolItem(
-            icon: CupertinoIcons.smiley,
-            label: 'Emoji',
-            isActive: engine.activePanel == KeyboardPanel.emoji,
-            onTap: () => engine.openPanel(KeyboardPanel.emoji),
-          ),
-          _buildPillToolItem(
-            icon: CupertinoIcons.doc_on_clipboard,
-            label: 'Clipboard',
-            isActive: engine.activePanel == KeyboardPanel.clipboard,
-            onTap: () => engine.openPanel(KeyboardPanel.clipboard),
-          ),
-          _buildPillToolItem(
-            icon: CupertinoIcons.arrow_right_arrow_left,
-            label: 'Edit',
-            isActive: engine.activePanel == KeyboardPanel.textEditing,
-            onTap: () => engine.openPanel(KeyboardPanel.textEditing),
-          ),
-          _buildPillToolItem(
-            icon: Icons.palette_outlined,
-            label: 'Themes',
-            isActive: engine.activePanel == KeyboardPanel.themes,
-            onTap: () => engine.openPanel(KeyboardPanel.themes),
-          ),
-          _buildPillToolItem(
-            icon: CupertinoIcons.hand_draw,
-            label: 'One-Hand',
-            isActive: engine.oneHandedMode != 'none',
-            onTap: () {
-              final next = engine.oneHandedMode == 'none'
-                  ? 'right'
-                  : (engine.oneHandedMode == 'right' ? 'left' : 'none');
-              engine.setOneHandedMode(next);
-            },
-          ),
-          _buildPillToolItem(
-            icon: CupertinoIcons.number,
-            label: 'Numbers',
-            isActive: engine.showNumberRow,
-            onTap: () => engine.toggleNumberRow(),
-          ),
-          _buildPillToolItem(
-            icon: CupertinoIcons.settings,
-            label: 'Settings',
-            isActive: false,
-            onTap: () => ImePlatformBridge().openSettings(),
-          ),
-        ],
+        children: orderedIds.map((id) {
+          final spec = KeyboardToolSpec.registry[id]!;
+          return _buildPillToolItem(
+            icon: spec.icon,
+            label: spec.label,
+            isActive: spec.isActive(engine),
+            onTap: () => spec.onTrigger(engine),
+          );
+        }).toList(),
       ),
     );
   }

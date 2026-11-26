@@ -15,25 +15,51 @@ class _KeyboardPreviewScreenState extends State<KeyboardPreviewScreen> {
   final TextEditingController _controller = TextEditingController();
   final ImePlatformBridge _bridge = ImePlatformBridge();
   final LanguageManager _langManager = LanguageManager();
+  int _composingLen = 0;
 
   @override
   void initState() {
     super.initState();
     _bridge.setMockMode(true);
 
+    _bridge.mockComposingCallback = (text) {
+      final current = _controller.text;
+      final end = current.length;
+      final start = (end - _composingLen).clamp(0, end);
+      final updated = current.replaceRange(start, end, text);
+      _composingLen = text.length;
+      _controller.value = TextEditingValue(
+        text: updated,
+        selection: TextSelection.collapsed(offset: updated.length),
+      );
+      if (mounted) setState(() {});
+    };
+
     _bridge.mockCommitCallback = (text) {
       final current = _controller.text;
-      final sel = _controller.selection;
-      if (sel.isValid && sel.start >= 0 && sel.end >= sel.start) {
-        final newText = current.replaceRange(sel.start, sel.end, text);
+      if (_composingLen > 0) {
+        final end = current.length;
+        final start = (end - _composingLen).clamp(0, end);
+        final newText = current.replaceRange(start, end, text);
+        _composingLen = 0;
         _controller.value = TextEditingValue(
           text: newText,
-          selection: TextSelection.collapsed(offset: sel.start + text.length),
+          selection: TextSelection.collapsed(offset: newText.length),
         );
       } else {
-        _controller.text = current + text;
-        _controller.selection = TextSelection.collapsed(offset: _controller.text.length);
+        final sel = _controller.selection;
+        if (sel.isValid && sel.start >= 0 && sel.end >= sel.start) {
+          final newText = current.replaceRange(sel.start, sel.end, text);
+          _controller.value = TextEditingValue(
+            text: newText,
+            selection: TextSelection.collapsed(offset: sel.start + text.length),
+          );
+        } else {
+          _controller.text = current + text;
+          _controller.selection = TextSelection.collapsed(offset: _controller.text.length);
+        }
       }
+      if (mounted) setState(() {});
     };
 
     _bridge.mockDeleteBackwardCallback = () {

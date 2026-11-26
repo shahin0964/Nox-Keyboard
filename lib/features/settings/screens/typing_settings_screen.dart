@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../../../app/widgets/modern_ui.dart';
 import '../../../data/preferences_helper.dart';
+import '../../../services/ime_platform_bridge.dart';
 
 class TypingSettingsScreen extends StatefulWidget {
   const TypingSettingsScreen({super.key});
@@ -20,6 +21,8 @@ class _TypingSettingsScreenState extends State<TypingSettingsScreen> {
   late bool _showSuggestionsBar;
   late bool _popupOnKeypress;
   late bool _soundOnKeypress;
+  late String _soundStyle;
+  late double _soundVolume;
   late bool _vibrateOnKeypress;
   late int _vibrationIntensity;
   late double _keyboardHeight;
@@ -39,6 +42,8 @@ class _TypingSettingsScreenState extends State<TypingSettingsScreen> {
     _showSuggestionsBar = _prefs.showSuggestionsBar;
     _popupOnKeypress = _prefs.popupOnKeypress;
     _soundOnKeypress = _prefs.soundOnKeypress;
+    _soundStyle = _prefs.soundStyle;
+    _soundVolume = _prefs.soundVolume;
     _vibrateOnKeypress = _prefs.vibrateOnKeypress;
     _vibrationIntensity = _prefs.vibrationIntensity;
     _keyboardHeight = _prefs.keyboardHeight.clamp(220.0, 340.0);
@@ -142,13 +147,66 @@ class _TypingSettingsScreenState extends State<TypingSettingsScreen> {
                   icon: CupertinoIcons.speaker_2_fill,
                   iconColor: const Color(0xFF10B981),
                   title: 'Sound on Keypress',
-                  subtitle: 'Play crisp click audio on every tap',
+                  subtitle: 'Built-in low-latency key click audio',
                   value: _soundOnKeypress,
                   onChanged: (val) async {
                     await _prefs.setSoundOnKeypress(val);
                     setState(() => _soundOnKeypress = val);
+                    if (val) {
+                      ImePlatformBridge().playKeySound(0, _soundStyle, _soundVolume);
+                    }
                   },
                 ),
+                if (_soundOnKeypress) ...[
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Sound Profile (Tap to Test)',
+                          style: TextStyle(fontSize: 12.5, color: Colors.white.withOpacity(0.7)),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            _soundStyleChip('Soft', 'soft'),
+                            const SizedBox(width: 6),
+                            _soundStyleChip('Mech', 'mechanical'),
+                            const SizedBox(width: 6),
+                            _soundStyleChip('Bubble', 'bubble'),
+                            const SizedBox(width: 6),
+                            _soundStyleChip('Type', 'typewriter'),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Sound Volume',
+                              style: TextStyle(fontSize: 12.5, color: Colors.white.withOpacity(0.7)),
+                            ),
+                            _valuePill('${(_soundVolume * 100).round()}%', const Color(0xFF10B981)),
+                          ],
+                        ),
+                        Slider(
+                          value: _soundVolume,
+                          min: 0.1,
+                          max: 1.0,
+                          activeColor: const Color(0xFF10B981),
+                          onChanged: (val) async {
+                            await _prefs.setSoundVolume(val);
+                            setState(() => _soundVolume = val);
+                          },
+                          onChangeEnd: (val) {
+                            ImePlatformBridge().playKeySound(0, _soundStyle, val);
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 _glassDivider(),
                 ModernSwitchTile(
                   icon: CupertinoIcons.waveform,
@@ -302,6 +360,37 @@ class _TypingSettingsScreenState extends State<TypingSettingsScreen> {
             label,
             style: TextStyle(
               color: isSelected ? const Color(0xFF34D399) : Colors.white70,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _soundStyleChip(String label, String styleId) {
+    final active = _soundStyle == styleId;
+    return Expanded(
+      child: InkWell(
+        onTap: () async {
+          await _prefs.setSoundStyle(styleId);
+          setState(() => _soundStyle = styleId);
+          ImePlatformBridge().playKeySound(0, styleId, _soundVolume);
+        },
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 7),
+          decoration: BoxDecoration(
+            color: active ? const Color(0xFF10B981).withOpacity(0.24) : Colors.white.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: active ? const Color(0xFF10B981) : Colors.white12),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: TextStyle(
+              color: active ? const Color(0xFF34D399) : Colors.white70,
               fontSize: 12,
               fontWeight: FontWeight.bold,
             ),

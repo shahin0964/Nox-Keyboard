@@ -11,7 +11,11 @@ class HapticSoundService {
 
   void playKeyClick([int effect = 0]) {
     if (_prefs.soundOnKeypress) {
-      _bridge.playKeySound(effect);
+      _bridge.playKeySound(
+        effect,
+        style: _prefs.soundStyle,
+        volume: _prefs.soundVolume,
+      );
     }
   }
 

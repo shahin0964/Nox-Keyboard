@@ -83,6 +83,21 @@ class KeyboardEngine extends ChangeNotifier {
   bool _forceShowToolbar = false;
   bool get forceShowToolbar => _forceShowToolbar;
 
+  List<String> _toolbarOrder = List<String>.from(PreferencesHelper.defaultToolbarOrder);
+  List<String> get toolbarOrder => _toolbarOrder;
+
+  void moveToolbarTool(int fromIndex, int toIndex) {
+    if (fromIndex < 0 || fromIndex >= _toolbarOrder.length) return;
+    if (toIndex < 0 || toIndex >= _toolbarOrder.length) return;
+    if (fromIndex == toIndex) return;
+    final list = List<String>.from(_toolbarOrder);
+    final item = list.removeAt(fromIndex);
+    list.insert(toIndex, item);
+    _toolbarOrder = list;
+    _prefs.setToolbarOrder(list);
+    notifyListeners();
+  }
+
   void toggleForceShowToolbar() {
     _forceShowToolbar = !_forceShowToolbar;
     notifyListeners();
@@ -95,6 +110,8 @@ class KeyboardEngine extends ChangeNotifier {
       _showNumberRow = _prefs.showNumberRow;
       _oneHandedMode = _prefs.oneHandedMode;
       _isFloating = _prefs.isFloatingMode;
+      _toolbarOrder = _prefs.toolbarOrder;
+      _toolbarOrder = _prefs.toolbarOrder;
       notifyListeners();
     });
 
@@ -110,6 +127,7 @@ class KeyboardEngine extends ChangeNotifier {
       _showNumberRow = _prefs.showNumberRow;
       _oneHandedMode = _prefs.oneHandedMode;
       _isFloating = _prefs.isFloatingMode;
+      _toolbarOrder = _prefs.toolbarOrder;
 
       final clip = data['clipboardText'] as String? ?? '';
       if (clip.trim().isNotEmpty) {
@@ -158,8 +176,7 @@ class KeyboardEngine extends ChangeNotifier {
   }
 
   bool get _isAvroActive {
-    final code = _langManager.currentLanguage.code;
-    return code == 'bn_avro' || (code == 'bn_BD' && _langManager.isBanglaPhonetic);
+    return _langManager.currentLanguage.code == 'bn_avro';
   }
 
   KeyboardPage get activePage {
@@ -179,7 +196,7 @@ class KeyboardEngine extends ChangeNotifier {
             );
           case 'bn_BD':
             return BanglaLayout.getPage(
-              isPhonetic: _langManager.isBanglaPhonetic,
+              isPhonetic: false,
               isShifted: _isShifted,
               isCapsLock: _isCapsLock,
             );
@@ -238,7 +255,7 @@ class KeyboardEngine extends ChangeNotifier {
   }
 
   void onKeyPress(KeyboardKey key) {
-    _hapticSound.onKeyFeedback();
+    _hapticSound.onKeyFeedback(key.action == KeyAction.space || key.action == KeyAction.backspace || key.action == KeyAction.enter ? 1 : 0);
 
     switch (key.action) {
       case KeyAction.character:
@@ -257,17 +274,26 @@ class KeyboardEngine extends ChangeNotifier {
         _handleEnter();
         break;
       case KeyAction.switchSymbols:
+        if (_isAvroActive && _composingWord.isNotEmpty) {
+          _bridge.finishComposingText();
+          _composingWord = '';
+        }
         _mode = KeyboardMode.symbols;
         notifyListeners();
         break;
       case KeyAction.switchMoreSymbols:
         _mode = KeyboardMode.moreSymbols;
         notifyListeners();
+        break;
       case KeyAction.switchLetters:
         _mode = KeyboardMode.letters;
         notifyListeners();
         break;
       case KeyAction.switchLanguage:
+        if (_isAvroActive && _composingWord.isNotEmpty) {
+          _bridge.finishComposingText();
+          _composingWord = '';
+        }
         _langManager.cycleNextLanguage();
         break;
       case KeyAction.emoji:
@@ -291,9 +317,31 @@ class KeyboardEngine extends ChangeNotifier {
     _forceShowToolbar = false;
 
     if (_isAvroActive && _mode == KeyboardMode.letters) {
-      // In Bangla Avro Phonetic: accumulate roman characters and compute phonetic output
-      _composingWord += char;
-      _updateSuggestions();
+      final isLetter = RegExp(r'[a-zA-Z]').hasMatch(char);
+      if (isLetter) {
+        // Live Avro Phonetic composing directly inside the target text box!
+        _composingWord += char;
+        _updateSuggestions();
+        final liveBangla = _candidates.isNotEmpty
+            ? _candidates.first.text
+            : _banglaPhonetic.parse(_composingWord);
+        _bridge.setComposingText(liveBangla);
+      } else {
+        // Punctuation/digit finalizes active Avro word first, then commits punctuation
+        if (_composingWord.isNotEmpty) {
+          final finalized = _candidates.isNotEmpty
+              ? _candidates.first.text
+              : _banglaPhonetic.parse(_composingWord);
+          _bridge.commitText('$finalized$char');
+          _learnCommittedWord(finalized);
+          _contextBefore += '$finalized$char';
+          _composingWord = '';
+        } else {
+          _bridge.commitText(char);
+          _contextBefore += char;
+        }
+        _updateSuggestions();
+      }
     } else {
       // Commit text first for instant zero-lag appearance in active field
       _bridge.commitText(char);
@@ -352,10 +400,20 @@ class KeyboardEngine extends ChangeNotifier {
 
     if (_composingWord.isNotEmpty) {
       _composingWord = _composingWord.substring(0, _composingWord.length - 1);
-      if (!_isAvroActive) {
+      _updateSuggestions();
+      if (_isAvroActive) {
+        if (_composingWord.isNotEmpty) {
+          final liveBangla = _candidates.isNotEmpty
+              ? _candidates.first.text
+              : _banglaPhonetic.parse(_composingWord);
+          _bridge.setComposingText(liveBangla);
+        } else {
+          _bridge.setComposingText('');
+          _bridge.finishComposingText();
+        }
+      } else {
         _bridge.deleteBackward();
       }
-      _updateSuggestions();
     } else {
       _bridge.deleteBackward();
       if (_contextBefore.isNotEmpty) {
@@ -438,7 +496,15 @@ class KeyboardEngine extends ChangeNotifier {
 
   void _handleEnter() {
     if (_composingWord.isNotEmpty) {
-      _learnCommittedWord(_composingWord);
+      if (_isAvroActive) {
+        final finalized = _candidates.isNotEmpty
+            ? _candidates.first.text
+            : _banglaPhonetic.parse(_composingWord);
+        _bridge.commitText(finalized);
+        _learnCommittedWord(finalized);
+      } else {
+        _learnCommittedWord(_composingWord);
+      }
     }
     _composingWord = '';
     _candidates.clear();

@@ -8,64 +8,63 @@ class BanglaLayout {
     required bool isCapsLock,
   }) {
     if (isPhonetic) {
-      // In phonetic mode, display QWERTY with Bengali hints
       return EnglishLayout.getPage(isShifted: isShifted, isCapsLock: isCapsLock);
     }
 
     final shift = isShifted || isCapsLock;
 
-    // Direct Bengali script layout
+    // Complete Direct Bangla Probhat/National Script Layout
     return KeyboardPage(
       rows: [
-        // Row 1
+        // Row 1 (Vowels / Numbers / Kars)
         KeyboardRow(keys: [
-          KeyboardKey(primary: shift ? 'ৎ' : '১', secondary: '!', alternateChars: ['১', 'ৎ']),
-          KeyboardKey(primary: shift ? 'ূ' : '২', secondary: '@', alternateChars: ['২', 'ূ']),
-          KeyboardKey(primary: shift ? 'ী' : '৩', secondary: '#', alternateChars: ['৩', 'ী']),
-          KeyboardKey(primary: shift ? 'ূ' : '৪', secondary: '\$', alternateChars: ['৪', 'ূ']),
-          KeyboardKey(primary: shift ? 'ৈ' : '৫', secondary: '%', alternateChars: ['৫', 'ৈ']),
-          KeyboardKey(primary: shift ? 'ৌ' : '৬', secondary: '^', alternateChars: ['৬', 'ৌ']),
-          KeyboardKey(primary: shift ? 'ঢ়' : '৭', secondary: '&', alternateChars: ['৭', 'ঢ়']),
-          KeyboardKey(primary: shift ? 'ড়' : '৮', secondary: '*', alternateChars: ['৮', 'ড়']),
-          KeyboardKey(primary: shift ? 'ঞ' : '৯', secondary: '(', alternateChars: ['৯', 'ঞ']),
-          KeyboardKey(primary: shift ? 'ঙ' : '০', secondary: ')', alternateChars: ['০', 'ঙ']),
+          KeyboardKey(primary: shift ? 'অ' : '১', secondary: 'অ', alternateChars: ['১', 'অ', 'ং']),
+          KeyboardKey(primary: shift ? 'আ' : '২', secondary: 'আ', alternateChars: ['২', 'আ', 'ঃ']),
+          KeyboardKey(primary: shift ? 'ই' : '৩', secondary: 'ই', alternateChars: ['৩', 'ই', 'ঈ']),
+          KeyboardKey(primary: shift ? 'ঈ' : '৪', secondary: 'ঈ', alternateChars: ['৪', 'ঈ', 'ঋ']),
+          KeyboardKey(primary: shift ? 'উ' : '৫', secondary: 'উ', alternateChars: ['৫', 'উ', 'ঊ']),
+          KeyboardKey(primary: shift ? 'ঊ' : '৬', secondary: 'ঊ', alternateChars: ['৬', 'ঊ', 'ৎ']),
+          KeyboardKey(primary: shift ? 'এ' : '৭', secondary: 'এ', alternateChars: ['৭', 'এ', 'ঐ']),
+          KeyboardKey(primary: shift ? 'ঐ' : '৮', secondary: 'ঐ', alternateChars: ['৮', 'ঐ', 'ড়']),
+          KeyboardKey(primary: shift ? 'ও' : '৯', secondary: 'ও', alternateChars: ['৯', 'ও', 'ঢ়']),
+          KeyboardKey(primary: shift ? 'ঔ' : '০', secondary: 'ঔ', alternateChars: ['০', 'ঔ', 'য়']),
         ]),
 
-        // Row 2
+        // Row 2 (Core Kars + Consonants)
         KeyboardRow(keys: [
-          KeyboardKey(primary: shift ? 'অ' : 'ো', alternateChars: ['ো', 'অ', 'ও']),
-          KeyboardKey(primary: shift ? 'ই' : 'ে', alternateChars: ['ে', 'ই', 'এ']),
-          KeyboardKey(primary: shift ? 'আ' : 'া', alternateChars: ['া', 'আ']),
-          KeyboardKey(primary: shift ? 'ঈ' : 'ী', alternateChars: ['ী', 'ঈ']),
-          KeyboardKey(primary: shift ? 'উ' : 'ু', alternateChars: ['ু', 'উ']),
-          KeyboardKey(primary: shift ? 'ভ' : 'ব', alternateChars: ['ব', 'ভ']),
-          KeyboardKey(primary: shift ? 'হ' : 'হ', alternateChars: ['হ', 'ঃ']),
-          KeyboardKey(primary: shift ? 'ঘ' : 'গ', alternateChars: ['গ', 'ঘ']),
-          KeyboardKey(primary: shift ? 'র' : 'র', alternateChars: ['র', 'ড়', 'ঢ়']),
-          KeyboardKey(primary: shift ? 'খ' : 'ক', alternateChars: ['ক', 'খ', 'ক্ক']),
+          KeyboardKey(primary: shift ? 'ূ' : 'ু', secondary: 'ু', alternateChars: ['ু', 'ূ', 'ৃ']),
+          KeyboardKey(primary: shift ? 'ী' : 'ি', secondary: 'ি', alternateChars: ['ি', 'ী']),
+          KeyboardKey(primary: shift ? 'আ' : 'া', secondary: 'আ', alternateChars: ['া', 'আ']),
+          KeyboardKey(primary: shift ? 'ৈ' : 'ে', secondary: 'ৈ', alternateChars: ['ে', 'ৈ']),
+          KeyboardKey(primary: shift ? 'ৌ' : 'ো', secondary: 'ৌ', alternateChars: ['ো', 'ৌ']),
+          KeyboardKey(primary: shift ? 'ভ' : 'ব', secondary: 'ভ', alternateChars: ['ব', 'ভ']),
+          KeyboardKey(primary: shift ? 'ঙ' : 'হ', secondary: 'ঙ', alternateChars: ['হ', 'ঙ', 'ঃ']),
+          KeyboardKey(primary: shift ? 'ঘ' : 'গ', secondary: 'ঘ', alternateChars: ['গ', 'ঘ']),
+          KeyboardKey(primary: shift ? 'ঢ়' : 'র', secondary: 'ঢ়', alternateChars: ['র', 'ড়', 'ঢ়']),
+          KeyboardKey(primary: shift ? 'খ' : 'ক', secondary: 'খ', alternateChars: ['ক', 'খ', 'ক্ষ']),
         ]),
 
-        // Row 3
+        // Row 3 (Consonants)
         KeyboardRow(keys: [
-          KeyboardKey(primary: 'SHIFT', action: KeyAction.shift, flex: 14),
-          KeyboardKey(primary: shift ? 'য' : 'দ', alternateChars: ['দ', 'ধ']),
-          KeyboardKey(primary: shift ? 'শ' : 'স', alternateChars: ['স', 'শ', 'ষ']),
-          KeyboardKey(primary: shift ? 'ষ' : 'শ', alternateChars: ['শ', 'ষ']),
-          KeyboardKey(primary: shift ? 'ণ' : 'ন', alternateChars: ['ন', 'ণ']),
-          KeyboardKey(primary: shift ? 'ম' : 'ম', alternateChars: ['ম', 'ঁ']),
-          KeyboardKey(primary: shift ? 'ফ' : 'প', alternateChars: ['প', 'ফ']),
-          KeyboardKey(primary: shift ? 'থ' : 'ত', alternateChars: ['ত', 'থ', 'ৎ']),
-          KeyboardKey(primary: shift ? 'ঝ' : 'জ', alternateChars: ['জ', 'ঝ', 'জ্ঞ']),
-          KeyboardKey(primary: 'BACKSPACE', action: KeyAction.backspace, flex: 14),
+          KeyboardKey(primary: 'SHIFT', action: KeyAction.shift, flex: 13),
+          KeyboardKey(primary: shift ? 'ধ' : 'দ', secondary: 'ধ', alternateChars: ['দ', 'ধ', 'ড', 'ঢ']),
+          KeyboardKey(primary: shift ? 'ষ' : 'স', secondary: 'ষ', alternateChars: ['স', 'শ', 'ষ']),
+          KeyboardKey(primary: shift ? 'ঞ' : 'শ', secondary: 'ঞ', alternateChars: ['শ', 'ঞ', 'চ', 'ছ']),
+          KeyboardKey(primary: shift ? 'ণ' : 'ন', secondary: 'ণ', alternateChars: ['ন', 'ণ', 'ল']),
+          KeyboardKey(primary: shift ? 'ল' : 'ম', secondary: 'ল', alternateChars: ['ম', 'ল', 'ঁ']),
+          KeyboardKey(primary: shift ? 'ফ' : 'প', secondary: 'ফ', alternateChars: ['প', 'ফ']),
+          KeyboardKey(primary: shift ? 'থ' : 'ত', secondary: 'থ', alternateChars: ['ত', 'থ', 'ট', 'ঠ', 'ৎ']),
+          KeyboardKey(primary: shift ? 'ঝ' : 'জ', secondary: 'ঝ', alternateChars: ['জ', 'ঝ', 'য', 'য়']),
+          KeyboardKey(primary: 'BACKSPACE', action: KeyAction.backspace, flex: 13),
         ]),
 
         // Row 4
         KeyboardRow(keys: [
           KeyboardKey(primary: '?123', action: KeyAction.switchSymbols, flex: 14),
-          KeyboardKey(primary: '্', secondary: 'hasant', alternateChars: ['্', 'ঁ', 'ং', 'ঃ'], flex: 10),
+          KeyboardKey(primary: '্', secondary: 'ঁ', alternateChars: ['্', 'ঁ', 'ং', 'ঃ'], flex: 10),
           KeyboardKey(primary: '🌐', action: KeyAction.switchLanguage, flex: 10),
           KeyboardKey(primary: 'SPACE', action: KeyAction.space, flex: 40),
-          KeyboardKey(primary: '।', secondary: '.', alternateChars: ['।', '.', ','], flex: 10),
+          KeyboardKey(primary: '।', secondary: ',', alternateChars: ['।', '.', ',', '?'], flex: 10),
           KeyboardKey(primary: 'ENTER', action: KeyAction.enter, flex: 16),
         ]),
       ],

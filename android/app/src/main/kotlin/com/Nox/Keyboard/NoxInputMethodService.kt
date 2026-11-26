@@ -52,6 +52,7 @@ class NoxInputMethodService : InputMethodService() {
     private var channel: MethodChannel? = null
     private var speechRecognizer: SpeechRecognizer? = null
     private var currentEditorInfo: EditorInfo? = null
+    private var soundEngine: KeySoundEngine? = null
     private val mainHandler = Handler(Looper.getMainLooper())
 
     companion object {
@@ -106,6 +107,7 @@ class NoxInputMethodService : InputMethodService() {
 
     override fun onCreate() {
         super.onCreate()
+        soundEngine = KeySoundEngine(this).apply { init() }
         initFlutterEngine()
     }
 
@@ -136,6 +138,16 @@ class NoxInputMethodService : InputMethodService() {
                 "commitText" -> {
                     val text = call.argument<String>("text") ?: ""
                     ic?.commitText(text, 1)
+                    result.success(true)
+                }
+                "setComposingText" -> {
+                    val text = call.argument<String>("text") ?: ""
+                    val cursor = call.argument<Int>("cursor") ?: 1
+                    ic?.setComposingText(text, cursor)
+                    result.success(true)
+                }
+                "finishComposingText" -> {
+                    ic?.finishComposingText()
                     result.success(true)
                 }
                 "deleteBackward" -> {
@@ -247,13 +259,18 @@ class NoxInputMethodService : InputMethodService() {
                     result.success(true)
                 }
                 "getMediaClipboardState" -> {
-                    val img = captureClipboardImagePath() ?: ""
-                    val ss = getRecentScreenshotPath() ?: ""
-                    result.success(hashMapOf(
-                        "hasPermission" to hasMediaPermission(),
-                        "clipboardImagePath" to img,
-                        "screenshotPath" to ss
-                    ))
+                    Thread {
+                        val img = captureClipboardImagePath() ?: ""
+                        val ss = getRecentScreenshotPath() ?: ""
+                        val hasPerm = hasMediaPermission()
+                        mainHandler.post {
+                            result.success(hashMapOf(
+                                "hasPermission" to hasPerm,
+                                "clipboardImagePath" to img,
+                                "screenshotPath" to ss
+                            ))
+                        }
+                    }.start()
                 }
                 "commitImage" -> {
                     val path = call.argument<String>("path") ?: ""
@@ -295,14 +312,11 @@ class NoxInputMethodService : InputMethodService() {
                     }
                 }
                 "playKeySound" -> {
-                    try {
-                        val effect = call.argument<Int>("effect") ?: AudioManager.FX_KEYPRESS_STANDARD
-                        val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-                        am.playSoundEffect(effect)
-                        result.success(true)
-                    } catch (e: Exception) {
-                        result.success(false)
-                    }
+                    val effect = call.argument<Int>("effect") ?: 0
+                    val style = call.argument<String>("style") ?: "soft"
+                    val volume = (call.argument<Double>("volume") ?: 0.7).toFloat()
+                    soundEngine?.play(style, volume, effect)
+                    result.success(true)
                 }
                 "performHaptic" -> {
                     val durationMs = (call.argument<Int>("duration") ?: 15).toLong()
@@ -427,8 +441,6 @@ class NoxInputMethodService : InputMethodService() {
             ""
         }
 
-        val clipboardImagePath = captureClipboardImagePath() ?: getRecentScreenshotPath() ?: ""
-
         val data = hashMapOf<String, Any>(
             "inputType" to inputType,
             "imeOptions" to imeOptions,
@@ -442,7 +454,7 @@ class NoxInputMethodService : InputMethodService() {
             "textBeforeCursor" to beforeText,
             "navBarHeightDp" to navBarDp,
             "clipboardText" to clipboardText,
-            "clipboardImagePath" to clipboardImagePath
+            "clipboardImagePath" to ""
         )
 
         channel?.invokeMethod("onStartInput", data)
@@ -682,6 +694,8 @@ class NoxInputMethodService : InputMethodService() {
 
     override fun onDestroy() {
         try {
+            soundEngine?.release()
+            soundEngine = null
             speechRecognizer?.destroy()
             speechRecognizer = null
         } catch (_: Exception) {}

@@ -22,6 +22,7 @@ class ImePlatformBridge {
 
   // Mock input callback for in-app preview testing
   void Function(String text)? mockCommitCallback;
+  void Function(String text)? mockComposingCallback;
   void Function()? mockDeleteBackwardCallback;
   void Function(int action)? mockActionCallback;
 
@@ -112,6 +113,29 @@ class ImePlatformBridge {
     } catch (_) {
       mockCommitCallback?.call(text);
     }
+  }
+
+  Future<void> setComposingText(String text, {int newCursorPosition = 1}) async {
+    if (_isMockMode) {
+      mockComposingCallback?.call(text);
+      return;
+    }
+    try {
+      await _imeChannel.invokeMethod('setComposingText', {
+        'text': text,
+        'cursor': newCursorPosition,
+      });
+    } catch (_) {}
+  }
+
+  Future<void> finishComposingText() async {
+    if (_isMockMode) {
+      mockComposingCallback?.call('');
+      return;
+    }
+    try {
+      await _imeChannel.invokeMethod('finishComposingText');
+    } catch (_) {}
   }
 
   Future<void> deleteBackward() async {
@@ -219,11 +243,23 @@ class ImePlatformBridge {
     }
   }
 
-  Future<void> playKeySound([int effect = 0]) async {
+  Future<void> playKeySound([int effect = 0, String style = 'soft', double volume = 0.7]) async {
     try {
-      await _imeChannel.invokeMethod('playKeySound', {'effect': effect});
+      await _imeChannel.invokeMethod('playKeySound', {
+        'effect': effect,
+        'style': style,
+        'volume': volume,
+      });
     } catch (_) {
-      SystemSound.play(SystemSoundType.click);
+      try {
+        await _appChannel.invokeMethod('playKeySound', {
+          'effect': effect,
+          'style': style,
+          'volume': volume,
+        });
+      } catch (_) {
+        SystemSound.play(SystemSoundType.click);
+      }
     }
   }
 

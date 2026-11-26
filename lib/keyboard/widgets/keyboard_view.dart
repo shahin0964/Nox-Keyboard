@@ -9,6 +9,7 @@ import 'toolbar_widget.dart';
 import 'tools_grid_panel.dart';
 import 'keyboard_key_widget.dart';
 import 'text_editing_pad.dart';
+import 'spider_web_painter.dart';
 import '../../features/clipboard/widgets/clipboard_panel.dart';
 import '../../features/emoji/widgets/emoji_palette.dart';
 import '../../features/voice/widgets/voice_typing_dialog.dart';
@@ -29,15 +30,19 @@ class NoxKeyboardView extends StatefulWidget {
 }
 
 class _NoxFirebaseViewState extends State<NoxKeyboardView>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   final KeyboardEngine _engine = KeyboardEngine();
   final ThemeManager _themeManager = ThemeManager();
   final PreferencesHelper _prefs = PreferencesHelper();
   final ImePlatformBridge _bridge = ImePlatformBridge();
+  final GlobalKey _gridBoxKey = GlobalKey();
+
   double _lastSyncedContentHeight = -1;
   late AnimationController _themeAnimController;
+  late AnimationController _rippleAnimController;
+  Offset? _lastRippleOrigin;
 
-  double get _keyAreaHeight => (220.0 + (_prefs.keyboardHeight - 275.0)).clamp(185.0, 275.0);
+  double get _keyAreaHeight => (220.0 + (_prefs.keyboardHeight - 275.0)).clamp(175.0, 285.0);
 
   NoxKeyboardTheme get _activeTheme => widget.overrideTheme ?? _themeManager.currentTheme;
 
@@ -48,12 +53,15 @@ class _NoxFirebaseViewState extends State<NoxKeyboardView>
       vsync: this,
       duration: const Duration(milliseconds: 3000),
     );
+    _rippleAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 520),
+    );
     _updateAnimationPlayback();
 
     _engine.addListener(_onEngineUpdate);
     _themeManager.addListener(_onThemeUpdate);
 
-    // Sync key area + 40dp toolbar + generous 60dp navigation bar clearance with native Android
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _syncNativeDimensions();
     });
@@ -68,13 +76,26 @@ class _NoxFirebaseViewState extends State<NoxKeyboardView>
   }
 
   void _updateAnimationPlayback() {
-    if (_activeTheme.isAnimated) {
+    final type = _activeTheme.animationType;
+    // spider_ripple runs ONLY on key taps for zero idle GPU overhead
+    if (_activeTheme.isAnimated && type != 'spider_ripple') {
       if (!_themeAnimController.isAnimating) {
         _themeAnimController.repeat();
       }
     } else {
       _themeAnimController.stop();
     }
+  }
+
+  void _triggerSpiderRipple(Offset globalPos) {
+    if (_activeTheme.animationType != 'spider_ripple') return;
+    final box = _gridBoxKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return;
+    final local = box.globalToLocal(globalPos);
+    final nx = (local.dx / box.size.width).clamp(0.0, 1.0);
+    final ny = (local.dy / box.size.height).clamp(0.0, 1.0);
+    _lastRippleOrigin = Offset(nx, ny);
+    _rippleAnimController.forward(from: 0.0);
   }
 
   void _syncNativeDimensions() {
@@ -92,6 +113,7 @@ class _NoxFirebaseViewState extends State<NoxKeyboardView>
   @override
   void dispose() {
     _themeAnimController.dispose();
+    _rippleAnimController.dispose();
     _engine.removeListener(_onEngineUpdate);
     _themeManager.removeListener(_onThemeUpdate);
     super.dispose();
@@ -110,119 +132,105 @@ class _NoxFirebaseViewState extends State<NoxKeyboardView>
   @override
   Widget build(BuildContext context) {
     final theme = _activeTheme;
-    // Generous 60dp bottom navigation clearance so no keys touch the Android gesture bar or switcher
     final double navBarPadding = widget.isImeMode ? 60.0 : 0.0;
+    final double keyAreaHeight = _keyAreaHeight;
+    final double totalHeight = 40.0 + keyAreaHeight + navBarPadding;
 
-    return AnimatedBuilder(
-      animation: _themeAnimController,
-      builder: (context, _) {
-        final double animValue = theme.isAnimated ? _themeAnimController.value : 0.0;
+    Widget mainContent;
+    switch (_engine.activePanel) {
+      case KeyboardPanel.toolsGrid:
+        mainContent = ToolsGridPanel(theme: theme, engine: _engine);
+        break;
+      case KeyboardPanel.emoji:
+        mainContent = EmojiPalette(theme: theme, engine: _engine);
+        break;
+      case KeyboardPanel.clipboard:
+        mainContent = ClipboardPanel(theme: theme, engine: _engine);
+        break;
+      case KeyboardPanel.textEditing:
+        mainContent = TextEditingPad(theme: theme, engine: _engine);
+        break;
+      case KeyboardPanel.voice:
+        mainContent = VoiceTypingPanel(theme: theme, engine: _engine);
+        break;
+      case KeyboardPanel.themes:
+        mainContent = ThemeQuickSwitcher(currentTheme: theme, engine: _engine);
+        break;
+      case KeyboardPanel.none:
+      default:
+        mainContent = _buildOptimizedKeyArea(theme);
+    }
 
-        Widget mainContent;
-        switch (_engine.activePanel) {
-          case KeyboardPanel.toolsGrid:
-            mainContent = ToolsGridPanel(theme: theme, engine: _engine);
-            break;
-          case KeyboardPanel.emoji:
-            mainContent = EmojiPalette(theme: theme, engine: _engine);
-            break;
-          case KeyboardPanel.clipboard:
-            mainContent = ClipboardPanel(theme: theme, engine: _engine);
-            break;
-          case KeyboardPanel.textEditing:
-            mainContent = TextEditingPad(theme: theme, engine: _engine);
-            break;
-          case KeyboardPanel.voice:
-            mainContent = VoiceTypingPanel(theme: theme, engine: _engine);
-            break;
-          case KeyboardPanel.themes:
-            mainContent = ThemeQuickSwitcher(currentTheme: theme, engine: _engine);
-            break;
-          case KeyboardPanel.none:
-          default:
-            mainContent = _buildKeyGrid(theme, animValue);
-        }
+    Widget keyboardBody = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ToolbarWidget(engine: _engine, theme: theme),
+        SizedBox(
+          height: keyAreaHeight,
+          child: mainContent,
+        ),
+        if (navBarPadding > 0) SizedBox(height: navBarPadding),
+      ],
+    );
 
-        final double keyAreaHeight = _keyAreaHeight;
-        final double totalHeight = 40.0 + keyAreaHeight + navBarPadding;
+    if (_engine.oneHandedMode != 'none') {
+      keyboardBody = _buildOneHandedWrapper(keyboardBody, theme, totalHeight, navBarPadding);
+    }
 
-        Widget keyboardBody = Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Single unified Gboard header bar (suggestions or toolbar + mic on right)
-            ToolbarWidget(engine: _engine, theme: theme),
-            SizedBox(
-              height: keyAreaHeight,
-              child: mainContent,
-            ),
-            // Dedicated 60dp navigation bar padding zone (lifts spacebar & keys completely above navigation bar)
-            if (navBarPadding > 0) SizedBox(height: navBarPadding),
-          ],
-        );
-
-        // Apply One-Handed mode wrapping if active
-        if (_engine.oneHandedMode != 'none') {
-          keyboardBody = _buildOneHandedWrapper(keyboardBody, theme, totalHeight, navBarPadding);
-        }
-
-        return Material(
-          color: theme.backgroundColor,
-          child: Container(
-            decoration: _buildKeyboardBackgroundDecoration(theme, animValue),
-            child: keyboardBody,
-          ),
-        );
-      },
+    return Material(
+      color: theme.backgroundColor,
+      child: Container(
+        color: theme.backgroundColor,
+        child: keyboardBody,
+      ),
     );
   }
 
-  BoxDecoration _buildKeyboardBackgroundDecoration(NoxKeyboardTheme theme, double animValue) {
-    if (theme.animationType == 'aurora' && theme.gradientColors.length >= 2) {
-      final beginAlign = Alignment(-1.0 + animValue * 2.0, -1.0);
-      final endAlign = Alignment(1.0 - animValue * 2.0, 1.0);
-      return BoxDecoration(
-        color: theme.backgroundColor,
-        gradient: LinearGradient(
-          begin: beginAlign,
-          end: endAlign,
-          colors: [
-            theme.backgroundColor,
-            theme.gradientColors[0].withOpacity(0.14),
-            theme.gradientColors[1].withOpacity(0.12),
-            theme.backgroundColor,
-          ],
-        ),
+  Widget _buildOptimizedKeyArea(NoxKeyboardTheme theme) {
+    final isSpider = theme.keyShape == 'spider_web';
+    final isRipple = theme.animationType == 'spider_ripple';
+    final needsContinuousAnim = theme.isAnimated && !isRipple;
+
+    // Static or single-pass canvas themes do NOT rebuild all 35 keys on every animation tick
+    Widget keyGridWidget;
+    if (needsContinuousAnim && !isSpider) {
+      keyGridWidget = AnimatedBuilder(
+        animation: _themeAnimController,
+        builder: (context, _) => _buildKeyGrid(theme, _themeAnimController.value),
       );
+    } else {
+      keyGridWidget = _buildKeyGrid(theme, 0.0);
     }
-    if (theme.animationType == 'rgb_wave') {
-      final hue = (animValue * 360.0) % 360.0;
-      final c1 = HSVColor.fromAHSV(0.10, hue, 0.85, 1.0).toColor();
-      final c2 = HSVColor.fromAHSV(0.08, (hue + 120) % 360, 0.85, 1.0).toColor();
-      return BoxDecoration(
-        color: theme.backgroundColor,
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [c1, theme.backgroundColor, c2],
-        ),
-      );
+
+    if (!isSpider) {
+      return RepaintBoundary(child: keyGridWidget);
     }
-    if (theme.animationType == 'cyber_scan' && theme.gradientColors.length >= 2) {
-      return BoxDecoration(
-        color: theme.backgroundColor,
-        gradient: LinearGradient(
-          begin: Alignment(-1.2 + animValue * 2.4, -0.5),
-          end: Alignment(-0.2 + animValue * 2.4, 0.5),
-          colors: [
-            theme.backgroundColor,
-            theme.gradientColors[0].withOpacity(0.12),
-            theme.gradientColors[1].withOpacity(0.10),
-            theme.backgroundColor,
-          ],
-        ),
-      );
-    }
-    return BoxDecoration(color: theme.backgroundColor);
+
+    // Spider Web RGB or Black Spider Ripple renders web veins in a single-pass CustomPainter layer
+    return RepaintBoundary(
+      key: _gridBoxKey,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          keyGridWidget,
+          IgnorePointer(
+            child: AnimatedBuilder(
+              animation: isRipple ? _rippleAnimController : _themeAnimController,
+              builder: (context, _) {
+                return CustomPaint(
+                  painter: SpiderWebPainter(
+                    isRippleMode: isRipple,
+                    animValue: isRipple ? 0.0 : _themeAnimController.value,
+                    rippleOrigin: _lastRippleOrigin,
+                    rippleProgress: isRipple ? _rippleAnimController.value : 0.0,
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildOneHandedWrapper(
@@ -241,7 +249,6 @@ class _NoxFirebaseViewState extends State<NoxKeyboardView>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          // Expand to full pill button
           InkWell(
             onTap: () => _engine.setOneHandedMode('none'),
             borderRadius: BorderRadius.circular(18),
@@ -250,18 +257,11 @@ class _NoxFirebaseViewState extends State<NoxKeyboardView>
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(theme.isDark ? 0.08 : 0.25),
                 shape: BoxShape.circle,
-                border: Border.all(
-                  color: Colors.white.withOpacity(theme.isDark ? 0.1 : 0.18),
-                ),
+                border: Border.all(color: Colors.white.withOpacity(theme.isDark ? 0.1 : 0.18)),
               ),
-              child: Icon(
-                CupertinoIcons.arrow_up_left_arrow_down_right,
-                size: 17,
-                color: theme.textColor,
-              ),
+              child: Icon(CupertinoIcons.arrow_up_left_arrow_down_right, size: 17, color: theme.textColor),
             ),
           ),
-          // Switch side pill button
           InkWell(
             onTap: () => _engine.setOneHandedMode(isLeft ? 'right' : 'left'),
             borderRadius: BorderRadius.circular(18),
@@ -270,9 +270,7 @@ class _NoxFirebaseViewState extends State<NoxKeyboardView>
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(theme.isDark ? 0.08 : 0.25),
                 shape: BoxShape.circle,
-                border: Border.all(
-                  color: Colors.white.withOpacity(theme.isDark ? 0.1 : 0.18),
-                ),
+                border: Border.all(color: Colors.white.withOpacity(theme.isDark ? 0.1 : 0.18)),
               ),
               child: Icon(
                 isLeft ? CupertinoIcons.arrow_right_circle : CupertinoIcons.arrow_left_circle,
@@ -301,13 +299,13 @@ class _NoxFirebaseViewState extends State<NoxKeyboardView>
   Widget _buildKeyGrid(NoxKeyboardTheme theme, double animValue) {
     final page = _engine.activePage;
     final numberRow = _engine.numberRow;
+    final int rowOffset = numberRow != null ? 1 : 0;
 
     return Container(
       padding: const EdgeInsets.only(bottom: 2, left: 2, right: 2),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          // Optional dedicated number row
           if (numberRow != null)
             Expanded(
               child: Row(
@@ -319,13 +317,13 @@ class _NoxFirebaseViewState extends State<NoxKeyboardView>
                     engine: _engine,
                     animValue: animValue,
                     colIndex: col,
-                    rowIndex: 0,
+                    rowIndex: -1,
+                    onTapOrigin: _triggerSpiderRipple,
                   ),
                 ),
               ),
             ),
 
-          // Standard layout rows
           ...List.generate(page.rows.length, (rowIdx) {
             final row = page.rows[rowIdx];
             return Expanded(
@@ -338,7 +336,8 @@ class _NoxFirebaseViewState extends State<NoxKeyboardView>
                     engine: _engine,
                     animValue: animValue,
                     colIndex: col,
-                    rowIndex: rowIdx + (numberRow != null ? 1 : 0),
+                    rowIndex: rowIdx,
+                    onTapOrigin: _triggerSpiderRipple,
                   ),
                 ),
               ),

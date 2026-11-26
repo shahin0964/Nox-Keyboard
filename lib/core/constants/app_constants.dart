@@ -16,6 +16,8 @@ class AppConstants {
   static const String keyKeyboardHeight = 'keyboard_height';
   static const String keyShowNumberRow = 'show_number_row';
   static const String keySoundOnKeypress = 'sound_on_keypress';
+  static const String keySoundStyle = 'sound_style';
+  static const String keySoundVolume = 'sound_volume';
   static const String keyVibrateOnKeypress = 'vibrate_on_keypress';
   static const String keyVibrationIntensity = 'vibration_intensity';
   static const String keyPopupOnKeypress = 'popup_on_keypress';
@@ -36,6 +38,7 @@ class AppConstants {
   static const String keyLearnedWordFreq = 'learned_word_freq';
   static const String keyLearnedBigrams = 'learned_bigrams';
   static const String keyImageClips = 'image_clips';
+  static const String keyToolbarOrder = 'toolbar_tool_order';
   static const String keyOnboardingCompleted = 'onboarding_completed';
 
   // Default Values

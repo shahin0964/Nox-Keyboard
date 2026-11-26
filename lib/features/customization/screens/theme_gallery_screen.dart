@@ -6,6 +6,7 @@ import '../../../services/ime_platform_bridge.dart';
 import '../../../themes/theme_model.dart';
 import '../../../themes/theme_manager.dart';
 import '../../../keyboard/widgets/keyboard_view.dart';
+import '../../../keyboard/widgets/spider_web_painter.dart';
 
 class ThemeGalleryScreen extends StatefulWidget {
   const ThemeGalleryScreen({super.key});
@@ -316,11 +317,14 @@ class _ThemeGalleryScreenState extends State<ThemeGalleryScreen>
 
   Widget _buildLiveThemeCard(NoxKeyboardTheme t, bool isSelected, double animVal) {
     Color dynamicGlow = t.accentColor;
-    if (t.animationType == 'rgb_wave') {
+    if (t.animationType == 'rgb_wave' || t.animationType == 'spider_web_rgb') {
       dynamicGlow = HSVColor.fromAHSV(1.0, (animVal * 360.0) % 360.0, 0.9, 1.0).toColor();
     } else if (t.animationType == 'cyber_scan') {
       final p = (math.sin(animVal * 2 * math.pi) + 1) * 0.5;
       dynamicGlow = Color.lerp(const Color(0xFFFF2A85), const Color(0xFF00E5FF), p) ?? t.accentColor;
+    } else if (t.animationType == 'spider_ripple') {
+      final p = (math.sin(animVal * 2 * math.pi) + 1) * 0.5;
+      dynamicGlow = Color.lerp(const Color(0xFF38BDF8), const Color(0xFFA855F7), p) ?? t.accentColor;
     }
 
     return Container(
@@ -379,54 +383,72 @@ class _ThemeGalleryScreenState extends State<ThemeGalleryScreen>
 
                 // Animated Mini-Keyboard Demo
                 Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: t.toolbarColor,
-                      borderRadius: BorderRadius.circular(10),
-                      gradient: t.animationType == 'aurora' && t.gradientColors.length >= 2
-                          ? LinearGradient(
-                              begin: Alignment(-1 + animVal * 2, -1),
-                              end: Alignment(1 - animVal * 2, 1),
-                              colors: [
-                                t.toolbarColor,
-                                t.gradientColors[0].withOpacity(0.18),
-                                t.gradientColors[1].withOpacity(0.15),
-                              ],
-                            )
-                          : null,
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Stack(
+                      fit: StackFit.expand,
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: ['Q', 'W', 'E', 'R']
-                              .asMap()
-                              .entries
-                              .map((e) => _miniKey(t, e.value, e.key, animVal))
-                              .toList(),
-                        ),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: ['A', 'S', 'D', 'F']
-                              .asMap()
-                              .entries
-                              .map((e) => _miniKey(t, e.value, e.key + 2, animVal))
-                              .toList(),
-                        ),
                         Container(
-                          width: 72,
-                          height: 11,
+                          padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(
-                            color: t.keyShape == 'neon_outline' ? t.keyColor.withOpacity(0.35) : t.keyColor,
-                            borderRadius: BorderRadius.circular(t.keyShape == 'pill' ? 10 : 4),
-                            border: Border.all(
-                              color: t.isAnimated ? dynamicGlow.withOpacity(0.65) : Colors.white24,
-                              width: 0.8,
-                            ),
+                            color: t.toolbarColor,
+                            gradient: t.animationType == 'aurora' && t.gradientColors.length >= 2
+                                ? LinearGradient(
+                                    begin: Alignment(-1 + animVal * 2, -1),
+                                    end: Alignment(1 - animVal * 2, 1),
+                                    colors: [
+                                      t.toolbarColor,
+                                      t.gradientColors[0].withOpacity(0.18),
+                                      t.gradientColors[1].withOpacity(0.15),
+                                    ],
+                                  )
+                                : null,
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                children: ['Q', 'W', 'E', 'R']
+                                    .asMap()
+                                    .entries
+                                    .map((e) => _miniKey(t, e.value, 0, e.key, animVal))
+                                    .toList(),
+                              ),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                children: ['A', 'S', 'D', 'F']
+                                    .asMap()
+                                    .entries
+                                    .map((e) => _miniKey(t, e.value, 1, e.key, animVal))
+                                    .toList(),
+                              ),
+                              Container(
+                                width: 72,
+                                height: 11,
+                                decoration: BoxDecoration(
+                                  color: t.keyShape == 'neon_outline' ? t.keyColor.withOpacity(0.35) : t.keyColor,
+                                  borderRadius: BorderRadius.circular(t.keyShape == 'pill' ? 10 : 4),
+                                  border: Border.all(
+                                    color: t.isAnimated ? dynamicGlow.withOpacity(0.65) : Colors.white24,
+                                    width: 0.8,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
+                        if (t.keyShape == 'spider_web')
+                          IgnorePointer(
+                            child: CustomPaint(
+                              painter: SpiderWebPainter(
+                                isRippleMode: t.animationType == 'spider_ripple',
+                                animValue: animVal,
+                                rippleOrigin: t.animationType == 'spider_ripple' ? const Offset(0.55, 0.45) : null,
+                                rippleProgress: t.animationType == 'spider_ripple' ? animVal : 0.0,
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -506,9 +528,13 @@ class _ThemeGalleryScreenState extends State<ThemeGalleryScreen>
     );
   }
 
-  Widget _miniKey(NoxKeyboardTheme t, String char, int col, double animVal) {
+  Widget _miniKey(NoxKeyboardTheme t, String char, int row, int col, double animVal) {
+    final isHeartCenter = t.keyShape == 'heart_center' &&
+        ((row == 0 && (col == 1 || col == 2)) || (row == 1 && (col == 1 || col == 2)));
     Color borderCol = t.keyBorderColor;
-    if (t.animationType == 'rgb_wave') {
+    if (isHeartCenter) {
+      borderCol = const Color(0xFFFF4D6D);
+    } else if (t.animationType == 'rgb_wave' || t.animationType == 'spider_web_rgb') {
       borderCol = HSVColor.fromAHSV(1.0, (animVal * 360 + col * 38) % 360, 0.9, 1.0).toColor();
     } else if (t.animationType == 'cyber_scan') {
       final p = (math.sin(animVal * 2 * math.pi - col * 0.6) + 1) * 0.5;
@@ -525,7 +551,9 @@ class _ThemeGalleryScreenState extends State<ThemeGalleryScreen>
       width: 24,
       height: 20,
       decoration: BoxDecoration(
-        color: t.keyShape == 'neon_outline' ? t.keyColor.withOpacity(0.3) : t.keyColor,
+        color: isHeartCenter
+            ? const Color(0xFFFF1744).withOpacity(0.75)
+            : (t.keyShape == 'neon_outline' ? t.keyColor.withOpacity(0.3) : t.keyColor),
         borderRadius: BorderRadius.circular(radius),
         border: t.keyShape == 'mechanical_3d'
             ? Border(
