@@ -13,8 +13,8 @@ class HapticSoundService {
     if (_prefs.soundOnKeypress) {
       _bridge.playKeySound(
         effect,
-        style: _prefs.soundStyle,
-        volume: _prefs.soundVolume,
+        _prefs.soundStyle,
+        _prefs.soundVolume,
       );
     }
   }

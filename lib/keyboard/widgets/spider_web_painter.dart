@@ -19,7 +19,7 @@ class SpiderWebPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width * 0.52, size.height * 0.48);
-    final maxR = math.hypot(size.width, size.height) * 0.65;
+    final maxR = math.sqrt(size.width * size.width + size.height * size.height) * 0.65;
 
     final Paint basePaint = Paint()
       ..style = PaintingStyle.stroke
