@@ -45,7 +45,13 @@ class _NoxFirebaseViewState extends State<NoxKeyboardView>
   late AnimationController _rippleAnimController;
   Offset? _lastRippleOrigin;
 
-  double get _keyAreaHeight => (220.0 + (_prefs.keyboardHeight - 275.0)).clamp(175.0, 285.0);
+  double get _keyAreaHeight {
+    final base = 220.0 + (_prefs.keyboardHeight - 275.0);
+    final isSixRow = _engine.activePanel == KeyboardPanel.none && _engine.activePage.rows.length >= 6;
+    return isSixRow
+        ? (base + 34.0).clamp(205.0, 315.0)
+        : base.clamp(175.0, 285.0);
+  }
 
   NoxKeyboardTheme get _activeTheme => widget.overrideTheme ?? _themeManager.currentTheme;
 

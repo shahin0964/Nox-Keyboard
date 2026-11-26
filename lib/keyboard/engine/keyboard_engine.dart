@@ -90,6 +90,21 @@ class KeyboardEngine extends ChangeNotifier {
     r'[a-zA-Z\u0981-\u09DF\u0900-\u0963\u0966-\u097F\u0621-\u065F\u0670-\u06D3]',
   );
 
+  static const Map<String, String> _banglaVowelToKar = {
+    'আ': 'া',
+    'ই': 'ি',
+    'ঈ': 'ী',
+    'উ': 'ু',
+    'ঊ': 'ূ',
+    'ঋ': 'ৃ',
+    'এ': 'ে',
+    'ঐ': 'ৈ',
+    'ও': 'ো',
+    'ঔ': 'ৌ',
+  };
+
+  static final RegExp _banglaConsonantEndRegex = RegExp(r'[\u0995-\u09B9\u09DC-\u09DF]$');
+
   List<String> _toolbarOrder = List<String>.from(PreferencesHelper.defaultToolbarOrder);
   List<String> get toolbarOrder => _toolbarOrder;
 
@@ -193,7 +208,7 @@ class KeyboardEngine extends ChangeNotifier {
   KeyboardPage get activePage {
     switch (_mode) {
       case KeyboardMode.symbols:
-        return SymbolsLayout.getPage1();
+        return SymbolsLayout.getPage1(languageCode: _langManager.currentLanguage.code);
       case KeyboardMode.moreSymbols:
         return SymbolsLayout.getPage2();
       case KeyboardMode.letters:
@@ -226,7 +241,9 @@ class KeyboardEngine extends ChangeNotifier {
   }
 
   KeyboardRow? get numberRow {
-    if (_showNumberRow && _mode == KeyboardMode.letters) {
+    if (_showNumberRow &&
+        _mode == KeyboardMode.letters &&
+        _langManager.currentLanguage.code != 'bn_BD') {
       return NumberRowLayout.getRow(languageCode: _langManager.currentLanguage.code);
     }
     return null;
@@ -270,7 +287,11 @@ class KeyboardEngine extends ChangeNotifier {
     notifyListeners();
   }
 
-  void onKeyPress(KeyboardKey key, {bool skipFeedback = false}) {
+  void onKeyPress(
+    KeyboardKey key, {
+    bool skipFeedback = false,
+    bool bypassAutoKar = false,
+  }) {
     if (!skipFeedback) {
       _hapticSound.onKeyFeedback(
         key.action == KeyAction.space || key.action == KeyAction.backspace || key.action == KeyAction.enter ? 1 : 0,
@@ -279,7 +300,7 @@ class KeyboardEngine extends ChangeNotifier {
 
     switch (key.action) {
       case KeyAction.character:
-        _handleCharacter(key.primary);
+        _handleCharacter(key.primary, bypassAutoKar: bypassAutoKar);
         break;
       case KeyAction.shift:
         _handleShift();
@@ -336,8 +357,17 @@ class KeyboardEngine extends ChangeNotifier {
     _lastCommittedWord = clean;
   }
 
-  void _handleCharacter(String char) {
+  void _handleCharacter(String char, {bool bypassAutoKar = false}) {
     _forceShowToolbar = false;
+
+    if (!bypassAutoKar &&
+        _mode == KeyboardMode.letters &&
+        _langManager.currentLanguage.code == 'bn_BD') {
+      final mappedKar = _banglaVowelToKar[char];
+      if (mappedKar != null && _banglaConsonantEndRegex.hasMatch(_contextBefore)) {
+        char = mappedKar;
+      }
+    }
 
     if (_isAvroActive && _mode == KeyboardMode.letters) {
       final isLetter = RegExp(r'[a-zA-Z]').hasMatch(char);

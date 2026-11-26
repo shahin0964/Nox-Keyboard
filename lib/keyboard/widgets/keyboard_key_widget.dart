@@ -6,7 +6,7 @@ import '../../themes/theme_model.dart';
 import '../../data/preferences_helper.dart';
 import '../../languages/language_manager.dart';
 import '../../services/ime_platform_bridge.dart';
-import 'keyboard_layout.dart';
+import '../layouts/keyboard_layout.dart';
 import '../engine/keyboard_engine.dart';
 import '../engine/haptic_sound_service.dart';
 import 'key_preview_popup.dart';
@@ -151,7 +151,10 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
             theme: widget.theme,
             onSelect: (selectedChar) {
               _removeOverlays();
-              widget.engine.onKeyPress(widget.keyboardKey.copyWith(primary: selectedChar));
+              widget.engine.onKeyPress(
+                widget.keyboardKey.copyWith(primary: selectedChar),
+                bypassAutoKar: true,
+              );
             },
           ),
         );
@@ -593,6 +596,10 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
     // Standard character key with dynamic Shift Uppercase / Lowercase rendering
     final hasSecondary = k.secondary != null;
     final displayChar = _getEffectiveChar();
+    final isSixRow = widget.engine.activePage.rows.length >= 6;
+    final charFontSize = isSixRow
+        ? (widget.theme.fontSize - 1.5).clamp(15.0, 20.0)
+        : widget.theme.fontSize;
 
     return Stack(
       children: [
@@ -601,20 +608,20 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
             displayChar,
             style: TextStyle(
               color: widget.theme.textColor,
-              fontSize: widget.theme.fontSize,
+              fontSize: charFontSize,
               fontWeight: FontWeight.w500,
             ),
           ),
         ),
         if (hasSecondary)
           Positioned(
-            top: 2,
-            right: 4,
+            top: 1.5,
+            right: 3.5,
             child: Text(
               k.secondary!,
               style: TextStyle(
-                color: widget.theme.secondaryTextColor.withOpacity(0.6),
-                fontSize: 10,
+                color: widget.theme.secondaryTextColor.withOpacity(0.62),
+                fontSize: isSixRow ? 9.0 : 10.0,
                 fontWeight: FontWeight.w400,
               ),
             ),
