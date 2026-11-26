@@ -242,6 +242,11 @@ class NoxInputMethodService : InputMethodService() {
                     val ok = ic?.performContextMenuAction(actionId) ?: false
                     result.success(ok)
                 }
+                "executeKeyCommand" -> {
+                    val cmd = call.argument<String>("command") ?: ""
+                    val ok = executeKeyCommand(cmd, ic)
+                    result.success(ok)
+                }
                 "startVoiceRecognition" -> {
                     val langCode = call.argument<String>("languageCode") ?: "en_US"
                     val started = startVoiceRecognition(langCode)
@@ -431,15 +436,24 @@ class NoxInputMethodService : InputMethodService() {
 
         val typeClass = inputType and InputType.TYPE_MASK_CLASS
         val variation = inputType and InputType.TYPE_MASK_VARIATION
-        val isPassword = (typeClass == InputType.TYPE_CLASS_TEXT) && (
+        val isPassword = (typeClass == InputType.TYPE_CLASS_TEXT && (
             variation == InputType.TYPE_TEXT_VARIATION_PASSWORD ||
             variation == InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD ||
             variation == InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD
-        )
+        )) || (typeClass == InputType.TYPE_CLASS_NUMBER &&
+            variation == InputType.TYPE_NUMBER_VARIATION_PASSWORD)
 
         val isNumber = (typeClass == InputType.TYPE_CLASS_NUMBER || typeClass == InputType.TYPE_CLASS_PHONE)
         val isEmail = (variation == InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS || variation == InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS)
         val isUri = (variation == InputType.TYPE_TEXT_VARIATION_URI)
+
+        val hintLower = (info.hintText?.toString() ?: "").lowercase()
+        val noPersonalized = (imeOptions and EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING) != 0
+        val isSensitive = isPassword || isNumber || noPersonalized ||
+            hintLower.contains("password") || hintLower.contains("passcode") ||
+            hintLower.contains("pin") || hintLower.contains("otp") ||
+            hintLower.contains("verification code") || hintLower.contains("cvv") ||
+            hintLower.contains("cvc") || hintLower.contains("card")
 
         val beforeText = currentInputConnection?.getTextBeforeCursor(50, 0)?.toString() ?: ""
         val navBarDp = inputContainer?.navBarHeightDp ?: 60f
@@ -460,6 +474,7 @@ class NoxInputMethodService : InputMethodService() {
             "actionLabel" to actionLabel,
             "packageName" to packageName,
             "isPassword" to isPassword,
+            "isSensitive" to isSensitive,
             "isNumber" to isNumber,
             "isEmail" to isEmail,
             "isUri" to isUri,
@@ -703,6 +718,103 @@ class NoxInputMethodService : InputMethodService() {
         } catch (_: Exception) {
             "FAILED"
         }
+    }
+
+    private fun executeKeyCommand(cmd: String, ic: android.view.inputmethod.InputConnection?): Boolean {
+        if (ic == null) return false
+        return when (cmd) {
+            "copy" -> ic.performContextMenuAction(android.R.id.copy)
+            "paste" -> ic.performContextMenuAction(android.R.id.paste)
+            "cut" -> ic.performContextMenuAction(android.R.id.cut)
+            "selectAll" -> ic.performContextMenuAction(android.R.id.selectAll)
+            "copyAll" -> {
+                ic.performContextMenuAction(android.R.id.selectAll)
+                ic.performContextMenuAction(android.R.id.copy)
+            }
+            "undo" -> {
+                val handled = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    ic.performContextMenuAction(android.R.id.undo)
+                } else false
+                if (!handled) {
+                    sendMetaKey(KeyEvent.KEYCODE_Z, KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON)
+                }
+                true
+            }
+            "redo" -> {
+                val handled = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    ic.performContextMenuAction(android.R.id.redo)
+                } else false
+                if (!handled) {
+                    sendMetaKey(KeyEvent.KEYCODE_Y, KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON)
+                }
+                true
+            }
+            "deleteForward" -> ic.deleteSurroundingText(0, 1)
+            "deleteWord" -> {
+                val before = ic.getTextBeforeCursor(50, 0)?.toString() ?: ""
+                if (before.isNotEmpty()) {
+                    val trimmed = before.trimEnd()
+                    val lastSpace = trimmed.lastIndexOfAny(charArrayOf(' ', '\n', '\t', ',', '.', '!', '?'))
+                    val deleteLen = if (lastSpace == -1) before.length else before.length - (lastSpace + 1)
+                    ic.deleteSurroundingText(deleteLen.coerceAtLeast(1), 0)
+                } else {
+                    ic.deleteSurroundingText(1, 0)
+                }
+                true
+            }
+            "clearAll" -> {
+                ic.performContextMenuAction(android.R.id.selectAll)
+                sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
+                true
+            }
+            "home" -> {
+                sendDownUpKeyEvents(KeyEvent.KEYCODE_MOVE_HOME)
+                true
+            }
+            "end" -> {
+                sendDownUpKeyEvents(KeyEvent.KEYCODE_MOVE_END)
+                true
+            }
+            "tab" -> {
+                sendDownUpKeyEvents(KeyEvent.KEYCODE_TAB)
+                true
+            }
+            "escape" -> {
+                sendDownUpKeyEvents(KeyEvent.KEYCODE_ESCAPE)
+                true
+            }
+            "left" -> {
+                sendDownUpKeyEvents(KeyEvent.KEYCODE_DPAD_LEFT)
+                true
+            }
+            "right" -> {
+                sendDownUpKeyEvents(KeyEvent.KEYCODE_DPAD_RIGHT)
+                true
+            }
+            "up" -> {
+                sendDownUpKeyEvents(KeyEvent.KEYCODE_DPAD_UP)
+                true
+            }
+            "down" -> {
+                sendDownUpKeyEvents(KeyEvent.KEYCODE_DPAD_DOWN)
+                true
+            }
+            "selectLeft" -> {
+                sendMetaKey(KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON)
+                true
+            }
+            "selectRight" -> {
+                sendMetaKey(KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON)
+                true
+            }
+            else -> false
+        }
+    }
+
+    private fun sendMetaKey(keyCode: Int, metaState: Int) {
+        val now = android.os.SystemClock.uptimeMillis()
+        currentInputConnection?.sendKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_DOWN, keyCode, 0, metaState))
+        currentInputConnection?.sendKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_UP, keyCode, 0, metaState))
     }
 
     override fun onDestroy() {

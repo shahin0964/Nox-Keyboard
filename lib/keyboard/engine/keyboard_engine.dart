@@ -12,6 +12,7 @@ import '../layouts/arabic_layout.dart';
 import '../layouts/urdu_layout.dart';
 import '../layouts/symbols_layout.dart';
 import '../layouts/number_row_layout.dart';
+import '../suggestions/dictionary_service.dart';
 import '../suggestions/suggestion_engine.dart';
 import '../suggestions/autocorrect_service.dart';
 import 'haptic_sound_service.dart';
@@ -63,6 +64,13 @@ class KeyboardEngine extends ChangeNotifier {
 
   bool _isPassword = false;
   bool get isPassword => _isPassword;
+
+  bool _isSensitive = false;
+  String _currentAppPackage = '';
+  String _sentenceBuffer = '';
+
+  bool _isKeyCommandMode = false;
+  bool get isKeyCommandMode => _isKeyCommandMode;
 
   int _actionId = 0;
   String _actionLabel = 'ENTER';
@@ -134,20 +142,27 @@ class KeyboardEngine extends ChangeNotifier {
       _oneHandedMode = _prefs.oneHandedMode;
       _isFloating = _prefs.isFloatingMode;
       _toolbarOrder = _prefs.toolbarOrder;
+      DictionaryService().ensureLoaded(_langManager.currentLanguage.code);
       _gridRevision++;
       notifyListeners();
     });
 
     _langManager.addListener(() {
+      DictionaryService().ensureLoaded(_langManager.currentLanguage.code).then((_) {
+        _updateSuggestions();
+        notifyListeners();
+      });
       _gridRevision++;
       _updateSuggestions();
       notifyListeners();
     });
 
     _bridge.onStartInputCallback = (data) async {
+      _flushSentenceHistory();
       await _prefs.reload();
       await ThemeManager().init();
       await _langManager.init();
+      DictionaryService().ensureLoaded(_langManager.currentLanguage.code);
       _showNumberRow = _prefs.showNumberRow;
       _oneHandedMode = _prefs.oneHandedMode;
       _isFloating = _prefs.isFloatingMode;
@@ -163,6 +178,14 @@ class KeyboardEngine extends ChangeNotifier {
       }
 
       _isPassword = data['isPassword'] as bool? ?? false;
+      final isNumberField = data['isNumber'] as bool? ?? false;
+      _isSensitive = _isPassword || (data['isSensitive'] as bool? ?? false) || isNumberField;
+      _currentAppPackage = data['packageName'] as String? ?? '';
+      _sentenceBuffer = '';
+      if (_isPassword || _isSensitive) {
+        _isKeyCommandMode = false;
+      }
+
       _actionId = data['actionId'] as int? ?? 0;
       final label = data['actionLabel'] as String? ?? '';
       _actionLabel = label.isNotEmpty ? label : _resolveActionLabel(_actionId);
@@ -175,10 +198,12 @@ class KeyboardEngine extends ChangeNotifier {
     };
 
     _bridge.onFinishInputCallback = () {
+      _flushSentenceHistory();
       _composingWord = '';
       _candidates.clear();
       _activePanel = KeyboardPanel.none;
       _forceShowToolbar = false;
+      _isKeyCommandMode = false;
       _gridRevision++;
       notifyListeners();
     };
@@ -206,6 +231,9 @@ class KeyboardEngine extends ChangeNotifier {
   }
 
   KeyboardPage get activePage {
+    if (_isKeyCommandMode && _mode == KeyboardMode.letters) {
+      return EnglishLayout.getPage(isShifted: false, isCapsLock: false);
+    }
     switch (_mode) {
       case KeyboardMode.symbols:
         return SymbolsLayout.getPage1(languageCode: _langManager.currentLanguage.code);
@@ -287,6 +315,110 @@ class KeyboardEngine extends ChangeNotifier {
     notifyListeners();
   }
 
+  void toggleKeyCommandMode() {
+    _isKeyCommandMode = !_isKeyCommandMode;
+    _activePanel = KeyboardPanel.none;
+    if (_isKeyCommandMode) {
+      _mode = KeyboardMode.letters;
+    }
+    _gridRevision++;
+    notifyListeners();
+  }
+
+  static const Map<String, String> _actionShortLabels = {
+    'action:copy': 'Copy',
+    'action:paste': 'Paste',
+    'action:cut': 'Cut',
+    'action:selectAll': 'All',
+    'action:undo': 'Undo',
+    'action:redo': 'Redo',
+    'action:deleteForward': 'Del →',
+    'action:deleteWord': 'Del W',
+    'action:clearAll': 'Clear',
+    'action:copyAll': 'CpAll',
+    'action:home': 'Home',
+    'action:end': 'End',
+    'action:tab': 'Tab',
+    'action:escape': 'Esc',
+    'action:left': '←',
+    'action:right': '→',
+    'action:up': '↑',
+    'action:down': '↓',
+    'action:selectLeft': 'Sel←',
+    'action:selectRight': 'Sel→',
+  };
+
+  String? getCommandLabelForKey(String rawKey) {
+    final clean = rawKey.trim().toLowerCase();
+    if (clean.length != 1) return null;
+    final mapping = _prefs.keyCommandsMap[clean];
+    if (mapping == null || mapping.isEmpty) return null;
+    if (_actionShortLabels.containsKey(mapping)) {
+      return _actionShortLabels[mapping];
+    }
+    if (mapping.startsWith('text:')) {
+      final t = mapping.substring(5).trim();
+      return t.length > 5 ? '${t.substring(0, 4)}…' : t;
+    }
+    return null;
+  }
+
+  void _handleKeyCommand(String char) {
+    final clean = char.trim().toLowerCase();
+    final mapping = _prefs.keyCommandsMap[clean];
+    if (mapping == null || mapping.isEmpty) {
+      return;
+    }
+    if (mapping.startsWith('action:')) {
+      final cmd = mapping.substring(7);
+      _bridge.executeKeyCommand(cmd);
+    } else if (mapping.startsWith('text:')) {
+      final txt = mapping.substring(5);
+      if (txt.isNotEmpty) {
+        _bridge.commitText(txt);
+        _appendToSentenceBuffer(txt);
+      }
+    }
+    if (!_prefs.keyModeStayActive) {
+      _isKeyCommandMode = false;
+      _gridRevision++;
+      notifyListeners();
+    }
+  }
+
+  void _appendToSentenceBuffer(String text) {
+    if (_isPassword || _isSensitive || !_prefs.isTypingHistoryEnabled) {
+      _sentenceBuffer = '';
+      return;
+    }
+    _sentenceBuffer += text;
+  }
+
+  void _trimSentenceBufferOne() {
+    if (_sentenceBuffer.isNotEmpty) {
+      _sentenceBuffer = _sentenceBuffer.substring(0, _sentenceBuffer.length - 1);
+    }
+  }
+
+  static bool _isLikelyPinOrCard(String s) {
+    final compact = s.replaceAll(RegExp(r'[\s\-]'), '');
+    if (RegExp(r'^\d{4,20}$').hasMatch(compact)) return true;
+    return false;
+  }
+
+  void _flushSentenceHistory() {
+    final raw = _sentenceBuffer;
+    _sentenceBuffer = '';
+    if (_isPassword || _isSensitive || !_prefs.isTypingHistoryEnabled) return;
+    final clean = raw.trim();
+    if (clean.length < 2 || _isLikelyPinOrCard(clean)) return;
+    _prefs.addTypingHistoryEntry(
+      text: clean,
+      language: _langManager.currentLanguage.nativeName,
+      packageName: _currentAppPackage,
+    );
+  }
+
   void onKeyPress(
     KeyboardKey key, {
     bool skipFeedback = false,
@@ -360,6 +492,11 @@ class KeyboardEngine extends ChangeNotifier {
   void _handleCharacter(String char, {bool bypassAutoKar = false}) {
     _forceShowToolbar = false;
 
+    if (_isKeyCommandMode && _mode == KeyboardMode.letters) {
+      _handleKeyCommand(char);
+      return;
+    }
+
     if (!bypassAutoKar &&
         _mode == KeyboardMode.letters &&
         _langManager.currentLanguage.code == 'bn_BD') {
@@ -387,10 +524,12 @@ class KeyboardEngine extends ChangeNotifier {
               : _banglaPhonetic.parse(_composingWord);
           _bridge.commitText('$finalized$char');
           _learnCommittedWord(finalized);
+          _appendToSentenceBuffer('$finalized$char');
           _contextBefore += '$finalized$char';
           _composingWord = '';
         } else {
           _bridge.commitText(char);
+          _appendToSentenceBuffer(char);
           _contextBefore += char;
         }
         _updateSuggestions();
@@ -398,6 +537,7 @@ class KeyboardEngine extends ChangeNotifier {
     } else {
       // Commit text first for instant zero-lag appearance in active field
       _bridge.commitText(char);
+      _appendToSentenceBuffer(char);
       _contextBefore += char;
       final isLetter = _wordCharRegex.hasMatch(char);
       if (isLetter && _mode == KeyboardMode.letters) {
@@ -468,9 +608,11 @@ class KeyboardEngine extends ChangeNotifier {
         }
       } else {
         _bridge.deleteBackward();
+        _trimSentenceBufferOne();
       }
     } else {
       _bridge.deleteBackward();
+      _trimSentenceBufferOne();
       if (_contextBefore.isNotEmpty) {
         _contextBefore = _contextBefore.substring(0, _contextBefore.length - 1);
       }
@@ -494,6 +636,7 @@ class KeyboardEngine extends ChangeNotifier {
           : _banglaPhonetic.parse(_composingWord);
       _bridge.commitText('$candidate ');
       _learnCommittedWord(candidate);
+      _appendToSentenceBuffer('$candidate ');
       _contextBefore += '$candidate ';
       _composingWord = '';
       _updateSuggestions();
@@ -511,9 +654,11 @@ class KeyboardEngine extends ChangeNotifier {
         // Replace composing word with autocorrected word
         for (int i = 0; i < _composingWord.length; i++) {
           _bridge.deleteBackward();
+          _trimSentenceBufferOne();
         }
         _bridge.commitText('${center.text} ');
         _learnCommittedWord(center.text);
+        _appendToSentenceBuffer('${center.text} ');
         _autocorrectService.recordAutocorrect(_composingWord, center.text);
         _contextBefore += '${center.text} ';
         _composingWord = '';
@@ -535,7 +680,9 @@ class KeyboardEngine extends ChangeNotifier {
         now.difference(_lastSpaceTapTime!).inMilliseconds < 450 &&
         _contextBefore.endsWith(' ')) {
       _bridge.deleteBackward();
+      _trimSentenceBufferOne();
       _bridge.commitText('. ');
+      _appendToSentenceBuffer('. ');
       _contextBefore = _contextBefore.substring(0, _contextBefore.length - 1) + '. ';
       _lastSpaceTapTime = null;
       _composingWord = '';
@@ -546,6 +693,7 @@ class KeyboardEngine extends ChangeNotifier {
 
     _lastSpaceTapTime = now;
     _bridge.commitText(' ');
+    _appendToSentenceBuffer(' ');
     _contextBefore += ' ';
     _composingWord = '';
     _updateSuggestions();
@@ -560,10 +708,12 @@ class KeyboardEngine extends ChangeNotifier {
             : _banglaPhonetic.parse(_composingWord);
         _bridge.commitText(finalized);
         _learnCommittedWord(finalized);
+        _appendToSentenceBuffer(finalized);
       } else {
         _learnCommittedWord(_composingWord);
       }
     }
+    _flushSentenceHistory();
     _composingWord = '';
     _candidates.clear();
     _bridge.performEditorAction(_actionId);
@@ -575,14 +725,17 @@ class KeyboardEngine extends ChangeNotifier {
 
     if (_isAvroActive) {
       _bridge.commitText('${candidate.text} ');
+      _appendToSentenceBuffer('${candidate.text} ');
       _contextBefore += '${candidate.text} ';
     } else {
       if (_composingWord.isNotEmpty) {
         for (int i = 0; i < _composingWord.length; i++) {
           _bridge.deleteBackward();
+          _trimSentenceBufferOne();
         }
       }
       _bridge.commitText('${candidate.text} ');
+      _appendToSentenceBuffer('${candidate.text} ');
       _contextBefore += '${candidate.text} ';
     }
 

@@ -24,14 +24,17 @@ void main() {
       expect(nextWords.contains('you'), true);
     });
 
-    test('AutocorrectService detects common typos', () {
+    test('AutocorrectService detects common typos across English & Bangla', () {
       final autocorrect = AutocorrectService();
       expect(autocorrect.findCorrection('teh', 'en_US'), 'the');
       expect(autocorrect.findCorrection('adn', 'en_US'), 'and');
       expect(autocorrect.findCorrection('dont', 'en_US'), "don't");
+      expect(autocorrect.findCorrection('tomorow', 'en_US'), 'tomorrow');
+      expect(autocorrect.findCorrection('ভালবাসা', 'bn_BD'), 'ভালোবাসা');
+      expect(autocorrect.findCorrection('বাংলাদেস', 'bn_BD'), 'বাংলাদেশ');
     });
 
-    test('SuggestionEngine generates candidates', () {
+    test('SuggestionEngine generates candidates including Bangla spell fix', () {
       final engine = SuggestionEngine();
       final candidates = engine.getSuggestions(
         composingWord: 'tha',
@@ -42,6 +45,16 @@ void main() {
         nextWordEnabled: true,
       );
       expect(candidates.isNotEmpty, true);
+
+      final bnCandidates = engine.getSuggestions(
+        composingWord: 'বাংলাদেস',
+        contextBefore: '',
+        languageCode: 'bn_BD',
+        isBanglaPhonetic: false,
+        autocorrectEnabled: true,
+        nextWordEnabled: true,
+      );
+      expect(bnCandidates.any((c) => c.text == 'বাংলাদেশ'), true);
     });
   });
 }

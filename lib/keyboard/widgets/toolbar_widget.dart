@@ -71,11 +71,13 @@ class ToolbarWidget extends StatelessWidget {
             ),
           ),
 
-          // Center: Either typing word suggestions OR toolbar pills
+          // Center: Key Command Banner OR typing word suggestions OR toolbar pills
           Expanded(
-            child: hasSuggestions
-                ? _buildSuggestionsRow(context)
-                : _buildToolsRow(context),
+            child: engine.isKeyCommandMode
+                ? _buildKeyModeBanner()
+                : (hasSuggestions
+                    ? _buildSuggestionsRow(context)
+                    : _buildToolsRow(context)),
           ),
 
           // Right: Permanent Voice (Microphone) button (Gboard style)
@@ -172,6 +174,56 @@ class ToolbarWidget extends StatelessWidget {
           ),
         );
       }),
+    );
+  }
+
+  Widget _buildKeyModeBanner() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: theme.accentColor.withOpacity(0.18),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: theme.accentColor.withOpacity(0.65), width: 1.0),
+      ),
+      child: Row(
+        children: [
+          Icon(CupertinoIcons.command, size: 14, color: theme.accentColor),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              'KEY MODE • C Copy • V Paste • X Cut • A All',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: theme.textColor,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          InkWell(
+            onTap: () => engine.toggleKeyCommandMode(),
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: theme.accentColor,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Text(
+                'Exit',
+                style: TextStyle(
+                  color: Colors.black,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

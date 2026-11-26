@@ -15,6 +15,8 @@ class PreferencesHelper {
   Map<String, List<String>>? _learnedBigramsCache;
   List<String>? _userDictCache;
   List<String>? _toolbarOrderCache;
+  Map<String, List<Map<String, String>>>? _typingHistoryCache;
+  Map<String, String>? _keyCommandsCache;
 
   void _invalidateCaches() {
     _shortcutsCache = null;
@@ -22,6 +24,8 @@ class PreferencesHelper {
     _learnedBigramsCache = null;
     _userDictCache = null;
     _toolbarOrderCache = null;
+    _typingHistoryCache = null;
+    _keyCommandsCache = null;
   }
 
   Future<void> init() async {
@@ -427,6 +431,7 @@ class PreferencesHelper {
   static const List<String> defaultToolbarOrder = [
     'emoji',
     'clipboard',
+    'keyMode',
     'textEditing',
     'themes',
     'oneHanded',
@@ -434,6 +439,181 @@ class PreferencesHelper {
     'settings',
     'voice',
   ];
+
+  // Built-in PC-style Ctrl / Command Key Mode mapping (A-Z -> action or text)
+  static const Map<String, String> defaultKeyCommands = {
+    'c': 'action:copy',
+    'v': 'action:paste',
+    'x': 'action:cut',
+    'a': 'action:selectAll',
+    'z': 'action:undo',
+    'y': 'action:redo',
+    'd': 'action:deleteForward',
+    'b': 'action:deleteWord',
+    'k': 'action:clearAll',
+    's': 'action:copyAll',
+    'h': 'action:home',
+    'e': 'action:end',
+    't': 'action:tab',
+    'q': 'action:escape',
+    'l': 'action:left',
+    'r': 'action:right',
+    'u': 'action:up',
+    'n': 'action:down',
+    'w': 'action:selectLeft',
+    'p': 'action:selectRight',
+  };
+
+  bool get keyModeStayActive => _prefs?.getBool(AppConstants.keyKeyModeStayActive) ?? true;
+  Future<bool> setKeyModeStayActive(bool val) async =>
+      await _prefs?.setBool(AppConstants.keyKeyModeStayActive, val) ?? false;
+
+  Map<String, String> get keyCommandsMap {
+    if (_keyCommandsCache != null) return _keyCommandsCache!;
+    final merged = Map<String, String>.from(defaultKeyCommands);
+    final raw = _prefs?.getString(AppConstants.keyKeyCommandsMap);
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw) as Map<String, dynamic>;
+        decoded.forEach((k, v) {
+          final cleanKey = k.trim().toLowerCase();
+          final val = v.toString();
+          if (cleanKey.length == 1 && val.isNotEmpty) {
+            merged[cleanKey] = val;
+          }
+        });
+      } catch (_) {}
+    }
+    _keyCommandsCache = merged;
+    return _keyCommandsCache!;
+  }
+
+  Future<void> setKeyCommand(String keyChar, String commandValue) async {
+    final cleanKey = keyChar.trim().toLowerCase();
+    if (cleanKey.isEmpty) return;
+    final map = Map<String, String>.from(keyCommandsMap);
+    if (commandValue.trim().isEmpty) {
+      map.remove(cleanKey);
+    } else {
+      map[cleanKey] = commandValue.trim();
+    }
+    _keyCommandsCache = map;
+    await _prefs?.setString(AppConstants.keyKeyCommandsMap, jsonEncode(map));
+  }
+
+  Future<void> resetKeyCommands() async {
+    _keyCommandsCache = Map<String, String>.from(defaultKeyCommands);
+    await _prefs?.remove(AppConstants.keyKeyCommandsMap);
+  }
+
+  // Date-by-Date Local Regular Text Typing History ("Data" screen)
+  bool get isTypingHistoryEnabled => _prefs?.getBool(AppConstants.keyTypingHistoryEnabled) ?? true;
+  Future<bool> setTypingHistoryEnabled(bool val) async =>
+      await _prefs?.setBool(AppConstants.keyTypingHistoryEnabled, val) ?? false;
+
+  Map<String, List<Map<String, String>>> get typingHistoryByDate {
+    if (_typingHistoryCache != null) return _typingHistoryCache!;
+    final raw = _prefs?.getString(AppConstants.keyTypingHistoryData);
+    if (raw == null || raw.isEmpty) {
+      _typingHistoryCache = {};
+      return _typingHistoryCache!;
+    }
+    try {
+      final decoded = jsonDecode(raw) as Map<String, dynamic>;
+      final Map<String, List<Map<String, String>>> parsed = {};
+      decoded.forEach((dateKey, value) {
+        if (value is List) {
+          parsed[dateKey] = value
+              .whereType<Map>()
+              .map((item) => item.map((k, v) => MapEntry(k.toString(), v.toString())))
+              .toList();
+        }
+      });
+      _typingHistoryCache = parsed;
+      return _typingHistoryCache!;
+    } catch (_) {
+      _typingHistoryCache = {};
+      return _typingHistoryCache!;
+    }
+  }
+
+  int get typingHistoryTotalCount {
+    int count = 0;
+    for (final entries in typingHistoryByDate.values) {
+      count += entries.length;
+    }
+    return count;
+  }
+
+  Future<void> addTypingHistoryEntry({
+    required String text,
+    required String language,
+    required String packageName,
+  }) async {
+    if (!isTypingHistoryEnabled) return;
+    final clean = text.trim();
+    if (clean.length < 2) return;
+
+    final now = DateTime.now();
+    final dateKey =
+        '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final timeStr =
+        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+
+    final map = typingHistoryByDate.map(
+      (k, v) => MapEntry(k, List<Map<String, String>>.from(v)),
+    );
+    final dayList = map.putIfAbsent(dateKey, () => []);
+    if (dayList.isNotEmpty && dayList.first['text'] == clean) return;
+
+    dayList.insert(0, {
+      'time': timeStr,
+      'text': clean,
+      'lang': language,
+      'app': packageName,
+    });
+    if (dayList.length > 150) {
+      dayList.removeRange(150, dayList.length);
+    }
+
+    final sortedDates = map.keys.toList()..sort((a, b) => b.compareTo(a));
+    if (sortedDates.length > 45) {
+      for (final oldDate in sortedDates.sublist(45)) {
+        map.remove(oldDate);
+      }
+    }
+
+    _typingHistoryCache = map;
+    await _prefs?.setString(AppConstants.keyTypingHistoryData, jsonEncode(map));
+  }
+
+  Future<void> deleteTypingHistoryEntry(String dateKey, int index) async {
+    final map = typingHistoryByDate.map(
+      (k, v) => MapEntry(k, List<Map<String, String>>.from(v)),
+    );
+    final dayList = map[dateKey];
+    if (dayList == null || index < 0 || index >= dayList.length) return;
+    dayList.removeAt(index);
+    if (dayList.isEmpty) {
+      map.remove(dateKey);
+    }
+    _typingHistoryCache = map;
+    await _prefs?.setString(AppConstants.keyTypingHistoryData, jsonEncode(map));
+  }
+
+  Future<void> deleteTypingHistoryDate(String dateKey) async {
+    final map = typingHistoryByDate.map(
+      (k, v) => MapEntry(k, List<Map<String, String>>.from(v)),
+    );
+    map.remove(dateKey);
+    _typingHistoryCache = map;
+    await _prefs?.setString(AppConstants.keyTypingHistoryData, jsonEncode(map));
+  }
+
+  Future<void> clearTypingHistory() async {
+    _typingHistoryCache = {};
+    await _prefs?.remove(AppConstants.keyTypingHistoryData);
+  }
 
   List<String> get toolbarOrder {
     if (_toolbarOrderCache != null) return _toolbarOrderCache!;

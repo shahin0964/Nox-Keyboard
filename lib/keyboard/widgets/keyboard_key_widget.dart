@@ -593,13 +593,44 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
       );
     }
 
-    // Standard character key with dynamic Shift Uppercase / Lowercase rendering
-    final hasSecondary = k.secondary != null;
-    final displayChar = _getEffectiveChar();
+    // Standard character key with dynamic Shift Uppercase / Lowercase or Key Command Mode rendering
+    final isKeyCmd = widget.engine.isKeyCommandMode && widget.engine.mode == KeyboardMode.letters;
+    final cmdLabel = isKeyCmd ? widget.engine.getCommandLabelForKey(k.primary) : null;
+    final hasSecondary = cmdLabel == null && k.secondary != null;
+    final displayChar = cmdLabel != null ? k.primary.toUpperCase() : _getEffectiveChar();
     final isSixRow = widget.engine.activePage.rows.length >= 6;
     final charFontSize = isSixRow
         ? (widget.theme.fontSize - 1.5).clamp(15.0, 20.0)
         : widget.theme.fontSize;
+
+    if (cmdLabel != null) {
+      return Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            displayChar,
+            style: TextStyle(
+              color: widget.theme.accentColor,
+              fontSize: (charFontSize - 2.5).clamp(13.0, 17.0),
+              fontWeight: FontWeight.w700,
+              height: 1.0,
+            ),
+          ),
+          const SizedBox(height: 1.5),
+          Text(
+            cmdLabel,
+            maxLines: 1,
+            overflow: TextOverflow.clip,
+            style: TextStyle(
+              color: widget.theme.textColor.withOpacity(0.82),
+              fontSize: 8.5,
+              fontWeight: FontWeight.w600,
+              height: 1.0,
+            ),
+          ),
+        ],
+      );
+    }
 
     return Stack(
       children: [

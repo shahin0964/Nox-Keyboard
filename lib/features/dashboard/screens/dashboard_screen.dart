@@ -212,6 +212,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       route: '/clipboard',
                     ),
                     _buildActionCard(
+                      title: 'Key',
+                      subtitle: 'C=Copy, V=Paste, X=Cut...',
+                      icon: CupertinoIcons.command,
+                      color: const Color(0xFF00E5FF),
+                      route: '/key-mode',
+                    ),
+                    _buildActionCard(
+                      title: 'Data',
+                      subtitle: '${_prefs.typingHistoryTotalCount} saved • by date',
+                      icon: CupertinoIcons.tray_full_fill,
+                      color: const Color(0xFF38BDF8),
+                      route: '/data-history',
+                    ),
+                    _buildActionCard(
                       title: 'Privacy & Data',
                       subtitle: '100% Offline & Local',
                       icon: CupertinoIcons.shield_lefthalf_fill,

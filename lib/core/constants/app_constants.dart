@@ -40,6 +40,10 @@ class AppConstants {
   static const String keyImageClips = 'image_clips';
   static const String keyToolbarOrder = 'toolbar_tool_order';
   static const String keyOnboardingCompleted = 'onboarding_completed';
+  static const String keyTypingHistoryData = 'typing_history_data';
+  static const String keyTypingHistoryEnabled = 'typing_history_enabled';
+  static const String keyKeyCommandsMap = 'key_commands_map';
+  static const String keyKeyModeStayActive = 'key_mode_stay_active';
 
   // Default Values
   static const double defaultKeyboardHeight = 275.0;

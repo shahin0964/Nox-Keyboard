@@ -55,7 +55,7 @@ class SuggestionEngine {
       }
 
       if (languageCode == 'bn_avro') {
-        // Bangla Avro Phonetic Suggestions
+        // Bangla Avro Phonetic Suggestions + Bangla spelling correction fallback
         final phoneticMatches = _banglaPhonetic.getPhoneticSuggestions(composingWord, limit: 3);
         for (int i = 0; i < phoneticMatches.length; i++) {
           final text = phoneticMatches[i];
@@ -68,20 +68,30 @@ class SuggestionEngine {
             );
           }
         }
+        if (phoneticMatches.isNotEmpty) {
+          final parsedTop = phoneticMatches.first;
+          final spellFix = _autocorrectService.findCorrection(parsedTop, 'bn_BD');
+          if (spellFix != null && !candidates.any((c) => c.text == spellFix)) {
+            candidates.add(SuggestionCandidate(text: spellFix, isAutocorrect: false));
+          }
+        }
       } else {
-        // Direct language suggestions
+        // Direct language prefix + spell correction suggestions across ALL scripts
         final prefixMatches = _dictionaryService.searchPrefix(composingWord, languageCode, limit: 3);
         String? correction;
-        if (autocorrectEnabled && candidates.isEmpty && languageCode.startsWith('en')) {
+        if (candidates.isEmpty) {
           correction = _autocorrectService.findCorrection(composingWord, languageCode);
         }
 
         // Center candidate is autocorrect or exact top prefix match
         if (candidates.isEmpty && correction != null && correction.toLowerCase() != cleanLower) {
           candidates.add(SuggestionCandidate(text: composingWord)); // Raw literal typed on left
-          candidates.add(SuggestionCandidate(text: correction, isAutocorrect: true)); // Autocorrect in center
-          if (prefixMatches.isNotEmpty && prefixMatches.first != correction) {
-            candidates.add(SuggestionCandidate(text: prefixMatches.first));
+          candidates.add(SuggestionCandidate(text: correction, isAutocorrect: true)); // Corrected word highlighted
+          for (final pm in prefixMatches) {
+            if (pm != correction && !candidates.any((c) => c.text == pm)) {
+              candidates.add(SuggestionCandidate(text: pm));
+              break;
+            }
           }
         } else if (prefixMatches.isNotEmpty) {
           if (candidates.isEmpty && prefixMatches.length >= 3) {

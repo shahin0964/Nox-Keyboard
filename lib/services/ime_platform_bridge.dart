@@ -373,6 +373,21 @@ class ImePlatformBridge {
     } catch (_) {}
   }
 
+  Future<bool> executeKeyCommand(String command) async {
+    if (_isMockMode) {
+      if (command == 'selectAll' || command == 'copy' || command == 'cut' || command == 'paste') {
+        return true;
+      }
+      return false;
+    }
+    try {
+      final res = await _imeChannel.invokeMethod<bool>('executeKeyCommand', {'command': command});
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<bool> startVoiceRecognition(String languageCode) async {
     if (_isMockMode) return false;
     try {

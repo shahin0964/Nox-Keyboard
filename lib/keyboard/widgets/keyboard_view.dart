@@ -201,11 +201,13 @@ class _NoxFirebaseViewState extends State<NoxKeyboardView>
       keyboardBody = _buildOneHandedWrapper(keyboardBody, theme, totalHeight, navBarPadding);
     }
 
-    return Material(
-      color: theme.backgroundColor,
-      child: Container(
+    return ClipRect(
+      child: Material(
         color: theme.backgroundColor,
-        child: keyboardBody,
+        child: Container(
+          color: theme.backgroundColor,
+          child: keyboardBody,
+        ),
       ),
     );
   }
@@ -230,29 +232,31 @@ class _NoxFirebaseViewState extends State<NoxKeyboardView>
       return RepaintBoundary(child: keyGridWidget);
     }
 
-    // Spider Web RGB or Black Spider Ripple renders web veins in a single-pass CustomPainter layer
+    // Spider Web RGB or Black Spider Ripple renders web veins in a single-pass CustomPainter layer clipped inside keyboard bounds
     return RepaintBoundary(
       key: _gridBoxKey,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          keyGridWidget,
-          IgnorePointer(
-            child: AnimatedBuilder(
-              animation: isRipple ? _rippleAnimController : _themeAnimController,
-              builder: (context, _) {
-                return CustomPaint(
-                  painter: SpiderWebPainter(
-                    isRippleMode: isRipple,
-                    animValue: isRipple ? 0.0 : _themeAnimController.value,
-                    rippleOrigin: _lastRippleOrigin,
-                    rippleProgress: isRipple ? _rippleAnimController.value : 0.0,
-                  ),
-                );
-              },
+      child: ClipRect(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            keyGridWidget,
+            IgnorePointer(
+              child: AnimatedBuilder(
+                animation: isRipple ? _rippleAnimController : _themeAnimController,
+                builder: (context, _) {
+                  return CustomPaint(
+                    painter: SpiderWebPainter(
+                      isRippleMode: isRipple,
+                      animValue: isRipple ? 0.0 : _themeAnimController.value,
+                      rippleOrigin: _lastRippleOrigin,
+                      rippleProgress: isRipple ? _rippleAnimController.value : 0.0,
+                    ),
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

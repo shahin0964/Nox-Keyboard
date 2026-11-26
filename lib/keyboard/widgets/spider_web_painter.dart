@@ -18,6 +18,10 @@ class SpiderWebPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (size.isEmpty) return;
+    canvas.save();
+    canvas.clipRect(Offset.zero & size);
+
     final center = Offset(size.width * 0.52, size.height * 0.48);
     final maxR = math.sqrt(size.width * size.width + size.height * size.height) * 0.65;
 
@@ -34,14 +38,14 @@ class SpiderWebPainter extends CustomPainter {
         startAngle: 0,
         endAngle: math.pi * 2,
         colors: [
-          HSVColor.fromAHSV(0.92, hue, 0.95, 1.0).toColor(),
-          HSVColor.fromAHSV(0.92, (hue + 75) % 360, 0.95, 1.0).toColor(),
-          HSVColor.fromAHSV(0.92, (hue + 160) % 360, 0.95, 1.0).toColor(),
-          HSVColor.fromAHSV(0.92, (hue + 255) % 360, 0.95, 1.0).toColor(),
-          HSVColor.fromAHSV(0.92, hue, 0.95, 1.0).toColor(),
+          HSVColor.fromAHSV(0.78, hue, 0.95, 1.0).toColor(),
+          HSVColor.fromAHSV(0.78, (hue + 75) % 360, 0.95, 1.0).toColor(),
+          HSVColor.fromAHSV(0.78, (hue + 160) % 360, 0.95, 1.0).toColor(),
+          HSVColor.fromAHSV(0.78, (hue + 255) % 360, 0.95, 1.0).toColor(),
+          HSVColor.fromAHSV(0.78, hue, 0.95, 1.0).toColor(),
         ],
       ).createShader(Offset.zero & size);
-      basePaint.strokeWidth = 1.3;
+      basePaint.strokeWidth = 1.15;
     } else {
       // Stealth dark idle web
       basePaint.color = Colors.white.withOpacity(0.065);
@@ -89,6 +93,8 @@ class SpiderWebPainter extends CustomPainter {
         ..style = PaintingStyle.fill;
       canvas.drawCircle(originPx, 22.0 * (1.0 - rippleProgress * 0.4), sparkPaint);
     }
+
+    canvas.restore();
   }
 
   void _drawWebGeometry(Canvas canvas, Size size, Offset center, double maxR, Paint paint) {
