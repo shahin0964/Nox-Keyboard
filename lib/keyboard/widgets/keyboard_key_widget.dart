@@ -180,7 +180,19 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
 
     if (k.action == KeyAction.character) {
       _showPreviewPopup();
-      if (k.alternateChars.isNotEmpty && !widget.engine.isKeyCommandMode) {
+      final holdCmd = widget.engine.mode == KeyboardMode.letters
+          ? widget.engine.getCommandLabelForKey(k.primary)
+          : null;
+      if (holdCmd != null) {
+        _longPressTimer = Timer(const Duration(milliseconds: 360), () {
+          _hasTriggeredLongPress = true;
+          _previewDismissTimer?.cancel();
+          _removeOverlays();
+          if (_isPressed && mounted) setState(() => _isPressed = false);
+          ImePlatformBridge().performHaptic(22);
+          widget.engine.triggerHoldCommand(k.primary);
+        });
+      } else if (k.alternateChars.isNotEmpty) {
         _longPressTimer = Timer(const Duration(milliseconds: 340), () {
           _showAlternatesPopup();
         });
@@ -593,44 +605,17 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
       );
     }
 
-    // Standard character key with dynamic Shift Uppercase / Lowercase or Key Command Mode rendering
-    final isKeyCmd = widget.engine.isKeyCommandMode && widget.engine.mode == KeyboardMode.letters;
-    final cmdLabel = isKeyCmd ? widget.engine.getCommandLabelForKey(k.primary) : null;
-    final hasSecondary = cmdLabel == null && k.secondary != null;
-    final displayChar = cmdLabel != null ? k.primary.toUpperCase() : _getEffectiveChar();
+    // Standard character key with dynamic Shift + Hold-Key shortcut hint rendering
+    final holdBadge = widget.engine.mode == KeyboardMode.letters
+        ? widget.engine.getCommandLabelForKey(k.primary)
+        : null;
+    final secondaryText = holdBadge ?? k.secondary;
+    final hasSecondary = secondaryText != null;
+    final displayChar = _getEffectiveChar();
     final isSixRow = widget.engine.activePage.rows.length >= 6;
     final charFontSize = isSixRow
         ? (widget.theme.fontSize - 1.5).clamp(15.0, 20.0)
         : widget.theme.fontSize;
-
-    if (cmdLabel != null) {
-      return Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            displayChar,
-            style: TextStyle(
-              color: widget.theme.accentColor,
-              fontSize: (charFontSize - 2.5).clamp(13.0, 17.0),
-              fontWeight: FontWeight.w700,
-              height: 1.0,
-            ),
-          ),
-          const SizedBox(height: 1.5),
-          Text(
-            cmdLabel,
-            maxLines: 1,
-            overflow: TextOverflow.clip,
-            style: TextStyle(
-              color: widget.theme.textColor.withOpacity(0.82),
-              fontSize: 8.5,
-              fontWeight: FontWeight.w600,
-              height: 1.0,
-            ),
-          ),
-        ],
-      );
-    }
 
     return Stack(
       children: [
@@ -649,11 +634,13 @@ class _KeyboardKeyWidgetState extends State<KeyboardKeyWidget> {
             top: 1.5,
             right: 3.5,
             child: Text(
-              k.secondary!,
+              secondaryText,
               style: TextStyle(
-                color: widget.theme.secondaryTextColor.withOpacity(0.62),
-                fontSize: isSixRow ? 9.0 : 10.0,
-                fontWeight: FontWeight.w400,
+                color: holdBadge != null
+                    ? widget.theme.accentColor.withOpacity(0.85)
+                    : widget.theme.secondaryTextColor.withOpacity(0.62),
+                fontSize: holdBadge != null ? 8.0 : (isSixRow ? 9.0 : 10.0),
+                fontWeight: holdBadge != null ? FontWeight.w700 : FontWeight.w400,
               ),
             ),
           ),

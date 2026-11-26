@@ -33,13 +33,6 @@ class KeyboardToolSpec {
       isActive: (e) => e.activePanel == KeyboardPanel.clipboard,
       onTrigger: (e, {fromGrid = false}) => e.openPanel(KeyboardPanel.clipboard),
     ),
-    'keyMode': KeyboardToolSpec(
-      id: 'keyMode',
-      icon: CupertinoIcons.command,
-      label: 'Key',
-      isActive: (e) => e.isKeyCommandMode,
-      onTrigger: (e, {fromGrid = false}) => e.toggleKeyCommandMode(),
-    ),
     'textEditing': KeyboardToolSpec(
       id: 'textEditing',
       icon: CupertinoIcons.arrow_right_arrow_left,

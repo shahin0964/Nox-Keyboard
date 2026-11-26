@@ -2,7 +2,7 @@ name: nox_keyboard
 description: "Nox Keyboard - Professional Android System Keyboard with Multilingual Typing, Bangla Phonetic, Material 3 Themes and Smart Suggestions."
 publish_to: 'none'
 
-version: 1.0.14+15
+version: 1.0.15+16
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

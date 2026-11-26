@@ -256,7 +256,7 @@ class _KeyModeScreenState extends State<KeyModeScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'PC Ctrl-Style Key Mode',
+                        'Built-In Hold-Key Shortcuts',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 15.5,
@@ -265,7 +265,7 @@ class _KeyModeScreenState extends State<KeyModeScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Tap the ⌘ Key icon on the keyboard toolbar to turn on Key Mode: press C to Copy, V to Paste, X to Cut, A to Select All, Z to Undo, or tap any key below to customize.',
+                        'Press and hold directly on your normal keyboard: Hold C to Copy, V to Paste, X to Cut, A to Select All, Z to Undo — no extra mode button needed!',
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.68),
                           fontSize: 12.5,
@@ -279,25 +279,8 @@ class _KeyModeScreenState extends State<KeyModeScreen> {
             ),
           ),
 
-          const SizedBox(height: 14),
-
-          GlassCard(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-            child: ModernSwitchTile(
-              icon: CupertinoIcons.pin_fill,
-              iconColor: const Color(0xFF34D399),
-              title: 'Stay in Key Mode',
-              subtitle: 'Keep Key Mode active for chaining multiple actions (A → C → V) until you tap Exit',
-              value: _stayActive,
-              onChanged: (val) async {
-                setState(() => _stayActive = val);
-                await _prefs.setKeyModeStayActive(val);
-              },
-            ),
-          ),
-
           const SizedBox(height: 18),
-          const ModernSectionHeader(title: 'ALL COMMAND KEYS (TAP TO EDIT)'),
+          const ModernSectionHeader(title: 'HOLD-KEY COMMANDS (TAP TO CUSTOMIZE)'),
 
           ..._alphabet.map((ch) {
             final val = _commands[ch];

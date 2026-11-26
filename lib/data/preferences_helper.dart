@@ -431,7 +431,6 @@ class PreferencesHelper {
   static const List<String> defaultToolbarOrder = [
     'emoji',
     'clipboard',
-    'keyMode',
     'textEditing',
     'themes',
     'oneHanded',
@@ -440,28 +439,19 @@ class PreferencesHelper {
     'voice',
   ];
 
-  // Built-in PC-style Ctrl / Command Key Mode mapping (A-Z -> action or text)
+  // Built-in Press & Hold Shortcut Commands on normal keyboard keys (Row 2 & 3 so Row 1 1-0 stays intact)
   static const Map<String, String> defaultKeyCommands = {
     'c': 'action:copy',
     'v': 'action:paste',
     'x': 'action:cut',
     'a': 'action:selectAll',
     'z': 'action:undo',
-    'y': 'action:redo',
+    's': 'action:copyAll',
     'd': 'action:deleteForward',
     'b': 'action:deleteWord',
     'k': 'action:clearAll',
-    's': 'action:copyAll',
     'h': 'action:home',
-    'e': 'action:end',
-    't': 'action:tab',
-    'q': 'action:escape',
-    'l': 'action:left',
-    'r': 'action:right',
-    'u': 'action:up',
-    'n': 'action:down',
-    'w': 'action:selectLeft',
-    'p': 'action:selectRight',
+    'l': 'action:end',
   };
 
   bool get keyModeStayActive => _prefs?.getBool(AppConstants.keyKeyModeStayActive) ?? true;

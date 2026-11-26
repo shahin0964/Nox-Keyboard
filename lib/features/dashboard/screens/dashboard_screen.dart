@@ -213,7 +213,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                     _buildActionCard(
                       title: 'Key',
-                      subtitle: 'C=Copy, V=Paste, X=Cut...',
+                      subtitle: 'Hold C Copy, V Paste, X Cut',
                       icon: CupertinoIcons.command,
                       color: const Color(0xFF00E5FF),
                       route: '/key-mode',

@@ -367,6 +367,14 @@ class KeyboardEngine extends ChangeNotifier {
     return null;
   }
 
+  Future<void> triggerHoldCommand(String char) async {
+    if (_isAvroActive && _composingWord.isNotEmpty) {
+      await _bridge.finishComposingText();
+      _composingWord = '';
+    }
+    await _handleKeyCommand(char);
+  }
+
   void _setKeyFeedback(String msg) {
     final token = ++_keyFeedbackToken;
     _keyCommandFeedback = msg;
