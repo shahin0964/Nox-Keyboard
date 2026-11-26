@@ -16,24 +16,22 @@ class AboutScreen extends StatelessWidget {
         children: [
           Center(
             child: Container(
-              width: 82,
-              height: 82,
+              width: 96,
+              height: 96,
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF00E5FF), Color(0xFF3B82F6)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF00E5FF).withOpacity(0.35),
-                    blurRadius: 18,
+                    color: const Color(0xFF00E5FF).withOpacity(0.32),
+                    blurRadius: 22,
                     offset: const Offset(0, 6),
                   ),
                 ],
               ),
-              child: const Icon(CupertinoIcons.keyboard, size: 42, color: Colors.black),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: Image.asset('assets/icons/nox_logo.png', fit: BoxFit.cover),
+              ),
             ),
           ),
           const SizedBox(height: 14),

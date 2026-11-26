@@ -5,8 +5,7 @@ import '../services/ime_platform_bridge.dart';
 import '../themes/theme_manager.dart';
 import '../languages/language_manager.dart';
 import 'routes.dart';
-import '../features/dashboard/screens/dashboard_screen.dart';
-import '../features/onboarding/screens/onboarding_screen.dart';
+import '../features/onboarding/screens/splash_screen.dart';
 import '../keyboard/widgets/keyboard_view.dart';
 
 class NoxApp extends StatefulWidget {
@@ -30,12 +29,6 @@ class _NoxAppState extends State<NoxApp> with WidgetsBindingObserver {
 
     if (widget.initialRoute != AppRoutes.ime) {
       _bridge.onNavigateRouteCallback = _handleNavigateRoute;
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
-        final extra = await _bridge.getInitialRouteExtra();
-        if (extra != null && extra.isNotEmpty) {
-          _handleNavigateRoute(extra);
-        }
-      });
     }
   }
 
@@ -122,7 +115,7 @@ class _NoxAppState extends State<NoxApp> with WidgetsBindingObserver {
         cardColor: const Color(0xFF1E293B),
         fontFamily: 'Roboto',
       ),
-      home: _prefs.onboardingCompleted ? const DashboardScreen() : const OnboardingScreen(),
+      home: const SplashScreen(),
       routes: AppRoutes.routes,
     );
   }

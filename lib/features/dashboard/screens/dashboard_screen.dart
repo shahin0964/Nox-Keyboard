@@ -71,24 +71,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
         elevation: 0,
         title: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(7),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF00E5FF), Color(0xFF3B82F6)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(11),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF00E5FF).withOpacity(0.28),
-                    blurRadius: 10,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+            ClipRRect(
+              borderRadius: BorderRadius.circular(11),
+              child: Image.asset(
+                'assets/icons/nox_logo.png',
+                width: 36,
+                height: 36,
+                fit: BoxFit.cover,
               ),
-              child: const Icon(CupertinoIcons.keyboard, size: 19, color: Colors.black),
             ),
             const SizedBox(width: 11),
             const Text(
